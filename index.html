@@ -34,7 +34,7 @@ button{font-family:inherit}
 .topactions{margin-left:auto;display:flex;gap:8px}
 
 /* layout */
-.wrap{max-width:1080px;margin:0 auto;padding:26px 22px 60px}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 22px 60px}
 .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
 h1{font-size:26px;margin:0;letter-spacing:-.3px;color:var(--ink)}
 .sub{margin:4px 0 0;color:var(--dim);font-size:14px}
@@ -138,7 +138,7 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:44px;text-align:center;color:var(--dim)}
 .empty h3{margin:0 0 6px;color:var(--ink)} .empty.small{padding:26px}
 .nomatch{padding:22px;text-align:center;color:var(--dim)}
-.foot{max-width:1080px;margin:0 auto;padding:0 22px 40px;color:var(--dim);font-size:12.5px}
+.foot{max-width:1180px;margin:0 auto;padding:0 22px 40px;color:var(--dim);font-size:12.5px}
 
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(16,28,42,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
@@ -255,6 +255,60 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .chip.saving{background:rgba(255,255,255,.14);color:#cfe0ee}
 .chip.saved{background:rgba(60,200,140,.18);color:#8ff0c4}
 #savechip:empty{display:none}
+/* ---- quote grid: one line when there's room, folds when there isn't ---- */
+.quotegrid tr.qsub{display:none}
+.quotegrid tr.qsub td{border-top:0;padding-top:0;padding-bottom:12px}
+.quotegrid tr.qmain td{border-bottom:0;padding-bottom:8px}
+.subline{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px}
+.subitem{display:inline-flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sublabel{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:700}
+.subitem select{min-width:22ch;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  font-family:inherit;font-size:15px;background:#fff}
+
+/* Tablet landscape (about 901-1250px): keep everything on ONE line by
+   tightening the columns — this is the iPad landscape case. */
+@media (min-width:901px) and (max-width:1250px){
+  .wrap{padding:22px 14px 50px}
+  .quotegrid td,.quotegrid th{padding-left:6px;padding-right:6px}
+  .quotegrid th:nth-child(3),.quotegrid td:nth-child(3){min-width:180px}
+  .quotegrid td:nth-child(3) select{min-width:0}
+  .quotegrid th:nth-child(4),.quotegrid td:nth-child(4),
+  .quotegrid th:nth-child(5),.quotegrid td:nth-child(5){min-width:100px}
+  .quotegrid td input.num{font-size:16px;padding:10px 8px}
+  .quotegrid input,.quotegrid select{font-size:16px;min-height:44px}
+  .quotegrid tr.qmain td{border-bottom:1px solid #eef1f5;padding-bottom:11px}
+}
+
+/* Narrow screens (phones, iPad portrait): fold type + extras underneath */
+@media (max-width:900px){
+  .wrap{padding:20px 12px 50px}
+  .quotegrid .celltype,.quotegrid .inlineticks,
+  .quotegrid .hdr-type,.quotegrid .hdr-extras{display:none}
+  .quotegrid tr.qsub{display:table-row}
+  .quotegrid tr.qmain td{border-bottom:0}
+  .quotegrid th:nth-child(3),.quotegrid td:nth-child(3){min-width:0}
+  .quotegrid input,.quotegrid select,.subitem select{font-size:16px;min-height:44px}
+  .quotegrid td input.num{font-size:17px}
+  .quotegrid th:nth-child(4),.quotegrid td:nth-child(4),
+  .quotegrid th:nth-child(5),.quotegrid td:nth-child(5){min-width:104px}
+}
+
+/* Comfortable tap targets on any touch device */
+@media (max-width:1250px){
+  .btn{padding:10px 15px}
+  .btn.small{padding:9px 12px}
+  .qprice{font-size:16px}
+}
+.chipbox{border:1px solid var(--line);background:#fff;color:var(--dim);border-radius:999px;
+  padding:7px 13px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;
+  margin-right:5px;white-space:nowrap;transition:.12s;-webkit-tap-highlight-color:transparent}
+.chipbox:hover{border-color:#b9c4d0;color:var(--text)}
+.chipbox.on{background:var(--teal);border-color:var(--teal);color:#fff}
+.chipbox.on:hover{background:var(--teal-d);color:#fff}
+.quotegrid .ticks{white-space:nowrap;line-height:2.2}
+@media (max-width:1250px){
+  .chipbox{padding:9px 12px;font-size:13.5px;margin-right:4px}
+}
 </style>
 </head>
 <body>
@@ -332,9 +386,9 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   /* Charges — edit here if any of these change */
   var INSTALL_PER_BLIND = 50;
   var ADDONS = [
-    { key: "motor",   label: "Motorisation", price: 10 },
-    { key: "highFit", label: "High fit",     price: 10 },
-    { key: "dual",    label: "Dual brackets", price: 30 }
+    { key: "motor",   label: "Motorisation",  short: "Motor",    price: 10 },
+    { key: "highFit", label: "High fit",      short: "High fit", price: 10 },
+    { key: "dual",    label: "Dual brackets", short: "Dual",     price: 30 }
   ];
   var GST_RATE = 0.10;
 
@@ -918,21 +972,27 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         return '<option value="' + esc(g) + '" ' + (g === w.group ? "selected" : "") + '>' + esc(PRICE_TABLES[g].label) + '</option>';
       }).join("");
       var boxes = ADDONS.map(function (a) {
-        return '<label class="tick" title="' + esc(a.label) + ' ' + money(a.price) + '">' +
-          '<input type="checkbox" data-qw="' + w.id + '" data-qf="' + a.key + '" ' + (w[a.key] ? "checked" : "") + '>' +
-          '<span>' + esc(a.label) + '</span></label>';
+        return '<button type="button" class="chipbox' + (w[a.key] ? " on" : "") + '"' +
+          ' data-qtoggle="' + w.id + '" data-qf="' + a.key + '"' +
+          ' title="' + esc(a.label) + ' — ' + money(a.price) + '">' +
+          esc(a.short || a.label) + '</button>';
       }).join("");
       var priceCell = qPriceHTML(L);
-      return '<tr>' +
+      var typeSelect = '<select data-qw="' + w.id + '" data-qf="group">' + groupOpts + '</select>';
+      return '<tr class="qmain">' +
         '<td class="idx">' + (i + 1) + '</td>' +
         '<td><input value="' + esc(w.name || "") + '" placeholder="Window name" data-qw="' + w.id + '" data-qf="name"></td>' +
-        '<td><select data-qw="' + w.id + '" data-qf="group">' + groupOpts + '</select></td>' +
-        '<td><input class="mono num" type="number" value="' + esc(w.width || "") + '" placeholder="mm" data-qw="' + w.id + '" data-qf="width"></td>' +
-        '<td><input class="mono num" type="number" value="' + esc(w.drop || "") + '" placeholder="mm" data-qw="' + w.id + '" data-qf="drop"></td>' +
-        '<td class="ticks">' + boxes + '</td>' +
+        '<td class="celltype">' + typeSelect + '</td>' +
+        '<td><input class="mono num" type="number" inputmode="numeric" value="' + esc(w.width || "") + '" placeholder="mm" data-qw="' + w.id + '" data-qf="width"></td>' +
+        '<td><input class="mono num" type="number" inputmode="numeric" value="' + esc(w.drop || "") + '" placeholder="mm" data-qw="' + w.id + '" data-qf="drop"></td>' +
+        '<td class="ticks inlineticks">' + boxes + '</td>' +
         '<td class="qtotal" data-qprice="' + w.id + '">' + priceCell + '</td>' +
         '<td class="rowact"><button class="btn small danger-ghost" data-del-qw="' + w.id + '" title="Remove window">✕</button></td>' +
-        '</tr>';
+        '</tr>' +
+        '<tr class="qsub"><td class="idx"></td><td colspan="7"><div class="subline">' +
+        '<span class="subitem"><span class="sublabel">Type</span>' + typeSelect + '</span>' +
+        '<span class="subitem"><span class="sublabel">Extras</span><span class="ticks">' + boxes + '</span></span>' +
+        '</div></td></tr>';
     }).join("");
 
     var canAdd = q.windows.length < MAX_QUOTE_WINDOWS;
@@ -960,8 +1020,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
       '<div class="card" style="margin-top:16px">' +
       '<table class="grid entry quotegrid"><thead><tr>' +
-      '<th class="idx">#</th><th>Window</th><th>Blind type</th><th>Width (mm)</th><th>Drop (mm)</th>' +
-      '<th>Extras</th><th class="ralign">Price</th><th></th></tr></thead>' +
+      '<th class="idx">#</th><th>Window</th><th class="hdr-type">Blind type</th><th>Width (mm)</th><th>Drop (mm)</th>' +
+      '<th class="hdr-extras">Extras</th><th class="ralign">Price</th><th></th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table>' +
       '<div class="entryfoot">' +
       '<button class="btn ' + (canAdd ? "primary" : "disabled") + '" data-action="add-qw" ' + (canAdd ? "" : "disabled") + '>+ Add window</button>' +
@@ -1354,7 +1414,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
       "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday]," +
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
-      "[data-edit-quote],[data-del-quote],.m-close,[data-msave]");
+      "[data-edit-quote],[data-del-quote],[data-qtoggle],.m-close,[data-msave]");
     if (!t) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
     else if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); render(); }
@@ -1367,6 +1427,18 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
     else if (t.hasAttribute("data-del-holiday")) deleteHoliday(t.getAttribute("data-del-holiday"));
     else if (t.hasAttribute("data-del-hgroup")) deleteHolidayGroup(t.getAttribute("data-del-hgroup"));
+    else if (t.hasAttribute("data-qtoggle")) {
+      var qt = getQuote(state.quoteId);
+      if (qt) {
+        var tw = qt.windows.filter(function (x) { return x.id === t.getAttribute("data-qtoggle"); })[0];
+        if (tw) {
+          var tk = t.getAttribute("data-qf");
+          tw[tk] = !tw[tk];
+          queueQuotePatch(qt.id, "windows", qt.windows);
+          render();
+        }
+      }
+    }
     else if (t.hasAttribute("data-edit-quote")) { state.view = "quote"; state.quoteId = t.getAttribute("data-edit-quote"); render(); }
     else if (t.hasAttribute("data-del-quote")) deleteQuote(t.getAttribute("data-del-quote"));
     else if (t.hasAttribute("data-del-qw")) {
