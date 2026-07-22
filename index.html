@@ -309,6 +309,15 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 @media (max-width:1250px){
   .chipbox{padding:9px 12px;font-size:13.5px;margin-right:4px}
 }
+.expcell{white-space:nowrap}
+.expinput{font-family:var(--mono);font-size:13px;padding:6px 8px;border:1px solid var(--line);
+  border-radius:7px;background:#fff;color:var(--text)}
+.expinput.manual{border-color:#d99a2b;background:#fff8e8;color:#8a5a05;font-weight:700}
+.expreset{border:0;background:transparent;color:#b8791b;cursor:pointer;font-size:15px;
+  padding:2px 5px;margin-left:3px;line-height:1}
+.expreset:hover{color:#8a5a05}
+input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a05;font-weight:700}
+.leadcustom{color:var(--teal);font-weight:700}
 </style>
 </head>
 <body>
@@ -401,7 +410,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   };
   var FACE_REC = ["Face / Make", "Rec / Tight"];
   var MAX_WINDOWS = 30;
-  var LEAD_DAYS = 25;
+  var DEFAULT_LEAD_DAYS = 25;   /* used when a client has no lead time set */
 
   var db = null, user = null;
   var clients = [], jobs = [], holidays = [], quotes = [], holidaySet = {};
@@ -465,16 +474,36 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       clientId: r.client_id || null, jobName: r.job_name || "",
       jobAddress: r.job_address || "", dateReceived: r.date_received || "",
       status: r.status || "Not Started", notes: r.notes || "",
+      expectedOverride: r.expected_override || "",
       windows: Array.isArray(r.windows) ? r.windows : []
     };
   }
   var FIELD_COL = {
     sanRef: "san_ref", clientRef: "client_ref", clientId: "client_id",
     jobName: "job_name", jobAddress: "job_address", dateReceived: "date_received",
-    status: "status", notes: "notes"
+    status: "status", notes: "notes", expectedOverride: "expected_override"
   };
   function getJob(id) { return jobs.filter(function (j) { return j.id === id; })[0]; }
   function getClient(id) { return clients.filter(function (c) { return c.id === id; })[0]; }
+  /* Expected completion: a manual date wins; otherwise count the
+     client's lead time in working days, skipping holidays. */
+  function clientLeadDays(clientId) {
+    var c = getClient(clientId);
+    var d = c && c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "" ? Number(c.lead_days) : NaN;
+    return (isFinite(d) && d > 0) ? d : DEFAULT_LEAD_DAYS;
+  }
+  function expectedFor(job) {
+    if (job.expectedOverride) return { iso: job.expectedOverride, manual: true };
+    var d = addWorkingDays(job.dateReceived, clientLeadDays(job.clientId));
+    return { iso: d ? localISO(d) : "", manual: false };
+  }
+  async function setExpectedOverride(jobId, iso) {
+    var j = getJob(jobId); if (!j) return;
+    j.expectedOverride = iso || "";
+    queueJobPatch(jobId, "expected_override", iso || null);
+    render();
+  }
+
   function windowCount(job) {
     return job.windows.filter(function (w) { return (w.name || "").trim() || num(w.width); }).length;
   }
@@ -713,10 +742,10 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     });
     var rows = list.map(function (j) {
       var c = getClient(j.clientId);
-      var comp = fmtDate(addWorkingDays(j.dateReceived, LEAD_DAYS));
+      var exp = expectedFor(j);
       if (state.clientView) {
         return '<tr' + (j.status === "Job Complete" ? ' class="done"' : '') + '><td class="strong">' + esc(j.jobName || "—") + '</td><td>' + esc(c ? c.name : "—") +
-          '</td><td>' + badge(j.status) + '</td><td class="mono">' + esc(comp) + '</td></tr>';
+          '</td><td>' + badge(j.status) + '</td><td class="mono">' + esc(fmtDate(exp.iso)) + '</td></tr>';
       }
       var opts = STATUSES.map(function (s) { return '<option ' + (s === j.status ? "selected" : "") + '>' + esc(s) + '</option>'; }).join("");
       return '<tr' + (j.status === "Job Complete" ? ' class="done"' : '') + '>' +
@@ -725,7 +754,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         '<td>' + esc(c ? c.name : "—") + '</td>' +
         '<td class="dim">' + esc(j.jobAddress || "") + '</td>' +
         '<td><select class="statussel ' + (STATUS_CLASS[j.status] || "s-grey") + '" data-status-job="' + j.id + '">' + opts + '</select></td>' +
-        '<td class="mono">' + esc(comp) + '</td>' +
+        '<td class="expcell">' +
+          '<input type="date" class="expinput' + (exp.manual ? " manual" : "") + '" value="' + esc(exp.iso) + '"' +
+          ' data-exp-job="' + j.id + '" title="' + (exp.manual ? "Set by hand — click the arrow to go back to the calculated date" : "Worked out from " + clientLeadDays(j.clientId) + " working days") + '">' +
+          (exp.manual ? '<button class="expreset" data-exp-clear="' + j.id + '" title="Back to the calculated date">↺</button>' : '') +
+        '</td>' +
         '<td class="rowact"><button class="btn small" data-edit="' + j.id + '">Edit</button>' +
         '<button class="btn small danger-ghost" data-del-job="' + j.id + '">Delete</button></td></tr>';
     }).join("");
@@ -749,8 +782,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   function renderClients() {
     var rows = clients.map(function (c) {
       var n = jobs.filter(function (j) { return j.clientId === c.id; }).length;
+      var ld = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "") ? c.lead_days : DEFAULT_LEAD_DAYS;
+      var custom = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "");
       return '<tr><td class="strong">' + esc(c.name) + '</td><td>' + esc(c.contact || "") + '</td>' +
         '<td>' + esc(c.phone || "") + '</td><td class="dim">' + esc(c.email || "") + '</td>' +
+        '<td class="mono ralign' + (custom ? ' leadcustom' : ' dim') + '">' + ld + '</td>' +
         '<td class="mono">' + n + '</td><td class="rowact">' +
         '<button class="btn small" data-link-client="' + c.id + '">Link</button>' +
         '<button class="btn small" data-edit-client="' + c.id + '">Edit</button>' +
@@ -759,7 +795,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     app.innerHTML = topbar("clients") + '<main class="wrap"><div class="pagehead">' +
       '<div><h1>Clients</h1><p class="sub">' + clients.length + ' client' + (clients.length === 1 ? "" : "s") + '</p></div>' +
       '<button class="btn primary" data-action="newclient">New client</button></div>' +
-      (clients.length ? '<div class="card"><table class="grid"><thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Jobs</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      (clients.length ? '<div class="card"><table class="grid"><thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th class="ralign">Lead days</th><th>Jobs</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
         : '<div class="empty"><h3>No clients yet</h3><button class="btn primary" data-action="newclient">New client</button></div>') +
       '</main>' + footer();
   }
@@ -836,7 +872,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       return '<option value="' + c.id + '" ' + (c.id === job.clientId ? "selected" : "") + '>' + esc(c.name) + '</option>';
     }).join("");
     var statusOpts = STATUSES.map(function (s) { return '<option ' + (s === job.status ? "selected" : "") + '>' + esc(s) + '</option>'; }).join("");
-    var comp = fmtDate(addWorkingDays(job.dateReceived, LEAD_DAYS));
+    var exp = expectedFor(job);
     return '<div class="card pad"><div class="formgrid">' +
       '<label class="fld"><span>Client</span><select data-job-client>' + clientOpts + '</select></label>' +
       field("SAN reference", job.sanRef, "sanRef", "S 0000") +
@@ -845,9 +881,17 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       field("Job address", job.jobAddress, "jobAddress", "Delivery address") +
       field("Date received", job.dateReceived, "dateReceived", "", "date") +
       '<label class="fld"><span>Stage</span><select data-job-field="status">' + statusOpts + '</select></label>' +
-      '<label class="fld"><span>Expected completion</span><input class="mono" value="' + esc(comp) + '" disabled></label>' +
-      '</div><label class="fld wide"><span>Notes</span><textarea rows="3" data-job-field="notes">' + esc(job.notes || "") + '</textarea></label>' +
-      (client ? '<div class="clientcard"><b>' + esc(client.name) + '</b> · ' + esc(client.contact || "") + ' · ' + esc(client.phone || "") + ' · ' + esc(client.email || "") + '</div>' : "") +
+      '<label class="fld"><span>Expected completion</span>' +
+      '<input type="date" class="' + (exp.manual ? "manualdate" : "") + '" value="' + esc(exp.iso) + '" data-exp-job="' + job.id + '"></label>' +
+      '</div>' +
+      '<p class="hint" style="margin:10px 2px 0">' +
+      (exp.manual
+        ? 'This date was set by hand. <button class="link" data-exp-clear="' + job.id + '">Go back to the calculated date</button>'
+        : 'Worked out from ' + clientLeadDays(job.clientId) + ' working days, skipping weekends and holidays.') +
+      '</p>' +
+      '<label class="fld wide"><span>Notes</span><textarea rows="3" data-job-field="notes">' + esc(job.notes || "") + '</textarea></label>' +
+      (client ? '<div class="clientcard"><b>' + esc(client.name) + '</b> · ' + esc(client.contact || "") + ' · ' + esc(client.phone || "") + ' · ' + esc(client.email || "") +
+        ' · <b>' + clientLeadDays(job.clientId) + ' working days</b></div>' : "") +
       '</div>';
   }
   function windowsTab(job) {
@@ -1239,10 +1283,22 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     openModal("Client details",
       '<div class="formgrid">' + cf("Name", c.name, "name") + cf("Contact", c.contact, "contact") +
       cf("Phone", c.phone, "phone") + cf("Email", c.email, "email") + cf("Address", c.address, "address") +
-      '</div><label class="fld wide"><span>Notes</span><textarea rows="2" data-cf="notes">' + esc(c.notes || "") + '</textarea></label>',
+      '<label class="fld"><span>Lead time (working days)</span>' +
+      '<input type="number" inputmode="numeric" min="1" value="' + esc(c.lead_days == null ? "" : c.lead_days) +
+      '" placeholder="' + DEFAULT_LEAD_DAYS + ' (default)" data-cf="lead_days"></label>' +
+      '</div><p class="hint" style="margin:12px 0 0">Leave the lead time blank to use the standard ' + DEFAULT_LEAD_DAYS +
+      ' working days. Changing it updates the expected date on this client\u2019s jobs.</p>' +
+      '<label class="fld wide"><span>Notes</span><textarea rows="2" data-cf="notes">' + esc(c.notes || "") + '</textarea></label>',
       async function () {
         var patch = {};
-        modalCollect("[data-cf]").forEach(function (o) { patch[o.k] = o.v; c[o.k] = o.v; });
+        modalCollect("[data-cf]").forEach(function (o) {
+          var v = o.v;
+          if (o.k === "lead_days") {
+            var n2 = parseInt(v, 10);
+            v = (String(o.v).trim() === "" || !isFinite(n2) || n2 <= 0) ? null : n2;
+          }
+          patch[o.k] = v; c[o.k] = v;
+        });
         var r = await db.from("clients").update(patch).eq("id", c.id);
         if (r.error) toast("Save failed."); render();
       });
@@ -1414,7 +1470,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
       "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday]," +
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
-      "[data-edit-quote],[data-del-quote],[data-qtoggle],.m-close,[data-msave]");
+      "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear],.m-close,[data-msave]");
     if (!t) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
     else if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); render(); }
@@ -1424,6 +1480,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
     else if (t.hasAttribute("data-newtoken")) regenerateToken(t.getAttribute("data-newtoken"));
     else if (t.hasAttribute("data-edit-client")) editClientDialog(t.getAttribute("data-edit-client"));
     else if (t.hasAttribute("data-del-job")) deleteJob(t.getAttribute("data-del-job"));
+    else if (t.hasAttribute("data-exp-clear")) setExpectedOverride(t.getAttribute("data-exp-clear"), "");
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
     else if (t.hasAttribute("data-del-holiday")) deleteHoliday(t.getAttribute("data-del-holiday"));
     else if (t.hasAttribute("data-del-hgroup")) deleteHolidayGroup(t.getAttribute("data-del-hgroup"));
@@ -1516,6 +1573,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
   document.addEventListener("change", function (e) {
     var el = e.target;
+    if (el.hasAttribute("data-exp-job")) { setExpectedOverride(el.getAttribute("data-exp-job"), el.value); return; }
     if (el.hasAttribute("data-status-job")) {
       var j = getJob(el.getAttribute("data-status-job")); if (j) { j.status = el.value; queueJobPatch(j.id, "status", el.value); render(); } return;
     }
