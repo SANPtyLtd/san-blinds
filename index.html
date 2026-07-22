@@ -318,6 +318,26 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .expreset:hover{color:#8a5a05}
 input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a05;font-weight:700}
 .leadcustom{color:var(--teal);font-weight:700}
+.sec{font-size:15px;margin:26px 2px 12px;color:var(--ink);text-transform:uppercase;letter-spacing:.6px}
+.pricecard{margin-bottom:18px}
+.gridscroll{overflow-x:auto}
+.pricegrid{border-collapse:collapse;font-size:13px;min-width:100%}
+.pricegrid th,.pricegrid td{border:1px solid #e6ebf0;padding:0}
+.pricegrid th.cnr{background:#f7f9fb;color:var(--dim);font-size:11px;padding:6px 8px;white-space:nowrap}
+.pricegrid thead th{background:#f2f6f9}
+.pricegrid .rowhd{background:#f7f9fb}
+.bandin,.cellin{width:100%;border:0;background:transparent;font-family:var(--mono);
+  font-size:13px;padding:9px 6px;text-align:center;color:var(--text)}
+.bandin{font-weight:700;color:var(--ink);background:#eef3f7}
+.cellin:focus,.bandin:focus{outline:2px solid var(--teal);background:#fff}
+.cellin.blankcell{background:#fdf3f3}
+.grouplabel{font-weight:700;font-size:15px;border:1px solid transparent;background:transparent;
+  padding:7px 9px;border-radius:8px;font-family:inherit;color:var(--ink);min-width:260px}
+.grouplabel:hover{border-color:var(--line);background:#fff}
+.grouplabel:focus{outline:2px solid var(--teal);background:#fff}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.fld-inline{padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-family:inherit;font-size:14px}
+.warnchip{background:#fbefd6;color:#8a5a05;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:700}
 </style>
 </head>
 <body>
@@ -401,6 +421,51 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   ];
   var GST_RATE = 0.10;
 
+  /* The values above are the built-in fallback. Once prices.sql has been
+     run they live in the database and are edited on the Prices tab. */
+  function builtInPricing() {
+    var groups = PRICE_GROUPS.map(function (k) {
+      var t = PRICE_TABLES[k], rows = {};
+      t.drops.forEach(function (d) { rows[d] = t.rows[d].slice(); });
+      return { key: k, label: t.label, widths: t.widths.slice(), drops: t.drops.slice(), rows: rows };
+    });
+    return {
+      install: INSTALL_PER_BLIND, gstRate: GST_RATE,
+      addons: ADDONS.map(function (a) { return { key: a.key, label: a.label, short: a.short, price: a.price }; }),
+      groups: groups
+    };
+  }
+  /* Normalise whatever comes back from the database */
+  function normalisePricing(d) {
+    if (!d || !Array.isArray(d.groups) || !d.groups.length) return builtInPricing();
+    return {
+      install: isFinite(Number(d.install)) ? Number(d.install) : 0,
+      gstRate: isFinite(Number(d.gstRate)) ? Number(d.gstRate) : 0.10,
+      addons: Array.isArray(d.addons) ? d.addons : [],
+      groups: d.groups
+    };
+  }
+  function pricingOf(list) { return normalisePricing(list && list.data); }
+  function currentList() {
+    for (var i = 0; i < priceLists.length; i++) if (priceLists[i].is_current) return priceLists[i];
+    return priceLists[0] || null;
+  }
+  function currentPricing() { return pricingOf(currentList()); }
+  /* A quote always prices on the list it was written against */
+  function pricingForQuote(q) {
+    if (q && q.priceListId) {
+      for (var i = 0; i < priceLists.length; i++) {
+        if (priceLists[i].id === q.priceListId) return pricingOf(priceLists[i]);
+      }
+    }
+    return currentPricing();
+  }
+  function groupOf(P, key) {
+    for (var i = 0; i < P.groups.length; i++) if (P.groups[i].key === key) return P.groups[i];
+    return null;
+  }
+  function groupLabel(P, key) { var g = groupOf(P, key); return g ? g.label : key; }
+
   var STATUSES = ["Not Started", "In Production", "Fabric / Product on Order",
     "Delayed", "On Hold", "Cancelled", "Job Complete"];
   var STATUS_CLASS = {
@@ -413,7 +478,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   var DEFAULT_LEAD_DAYS = 25;   /* used when a client has no lead time set */
 
   var db = null, user = null;
-  var clients = [], jobs = [], holidays = [], quotes = [], holidaySet = {};
+  var clients = [], jobs = [], holidays = [], quotes = [], priceLists = [], holidaySet = {};
   var app, booted = false;
 
   /* ---------- helpers ---------- */
@@ -517,7 +582,8 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       db.from("clients").select("*").order("name"),
       db.from("jobs").select("*").order("created_at", { ascending: false }),
       db.from("holidays").select("*").order("day"),
-      db.from("quotes").select("*").order("created_at", { ascending: false })
+      db.from("quotes").select("*").order("created_at", { ascending: false }),
+      db.from("price_lists").select("*").order("created_at", { ascending: false })
     ]);
     if (res[0].error || res[1].error || res[2].error) {
       throw (res[0].error || res[1].error || res[2].error);
@@ -528,9 +594,12 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     /* quotes table is optional until quotes.sql has been run */
     quotes = (res[3] && !res[3].error) ? (res[3].data || []).map(toAppQuote) : [];
     if (res[3] && res[3].error) quotesReady = false; else quotesReady = true;
+    /* price_lists table is optional until prices.sql has been run */
+    priceLists = (res[4] && !res[4].error) ? (res[4].data || []) : [];
+    pricesReady = !!(res[4] && !res[4].error);
     rebuildHolidaySet();
   }
-  var quotesReady = true;
+  var quotesReady = true, pricesReady = true;
   var rtSetUp = false;
   function setupRealtime() {
     if (rtSetUp) return; rtSetUp = true;
@@ -539,6 +608,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, onRemoteChange)
       .on("postgres_changes", { event: "*", schema: "public", table: "holidays" }, onRemoteChange)
       .on("postgres_changes", { event: "*", schema: "public", table: "quotes" }, onRemoteChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "price_lists" }, onRemoteChange)
       .subscribe();
   }
   var remoteT;
@@ -581,6 +651,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     if (state.view === "holidays") return renderHolidays();
     if (state.view === "quotes") return quotesReady ? renderQuotes() : renderQuotesNotReady();
     if (state.view === "quote") return renderQuoteEditor();
+    if (state.view === "prices") return pricesReady ? renderPrices() : renderPricesNotReady();
     return renderDashboard();
   }
   function configured() {
@@ -594,7 +665,8 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   var MAX_QUOTE_WINDOWS = 30;
 
   function blankQuoteWindow() {
-    return { id: uid(), name: "", group: PRICE_GROUPS[0], width: "", drop: "",
+    var P0 = currentPricing();
+    return { id: uid(), name: "", group: (P0.groups[0] ? P0.groups[0].key : ""), width: "", drop: "",
              motor: false, highFit: false, dual: false };
   }
   function toAppQuote(r) {
@@ -609,6 +681,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       ordered: r.ordered === true,
       orderedDate: r.ordered_date || "",
       fabricNotes: r.fabric_notes || "",
+      priceListId: r.price_list_id || null,
       windows: Array.isArray(r.windows) && r.windows.length ? r.windows : [blankQuoteWindow()]
     };
   }
@@ -644,8 +717,8 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     return null;
   }
   /* Returns { price, wBand, dBand } or { error } */
-  function blindPrice(group, width, drop) {
-    var t = PRICE_TABLES[group];
+  function blindPrice(P, group, width, drop) {
+    var t = groupOf(P, group);
     if (!t) return { error: "Pick a blind type" };
     var w = Number(width), d = Number(drop);
     if (!isFinite(w) || w <= 0 || !isFinite(d) || d <= 0) return { error: "" };
@@ -656,30 +729,32 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     if (!row || idx < 0 || typeof row[idx] !== "number") return { error: "No price listed" };
     return { price: row[idx], wBand: wB, dBand: dB };
   }
-  function addonTotal(w) {
+  function addonTotal(P, w) {
     var t = 0;
-    ADDONS.forEach(function (a) { if (w[a.key]) t += a.price; });
+    P.addons.forEach(function (a) { if (w[a.key]) t += a.price; });
     return t;
   }
   function quoteLines(q) {
+    var P = pricingForQuote(q);
     return (q.windows || []).map(function (w) {
-      var r = blindPrice(w.group, w.width, w.drop);
+      var r = blindPrice(P, w.group, w.width, w.drop);
       var counts = typeof r.price === "number";
       var blind = counts ? r.price : 0;
-      var addons = addonTotal(w);
-      var install = q.install ? INSTALL_PER_BLIND : 0;
+      var addons = addonTotal(P, w);
+      var install = q.install ? P.install : 0;
       return { w: w, res: r, blind: blind, addons: addons, install: install,
                total: counts ? blind + addons + install : 0, counts: counts };
     });
   }
   function quoteTotals(q) {
+    var P = pricingForQuote(q);
     var t = { blinds: 0, addons: 0, install: 0, qty: 0, sub: 0, gst: 0, total: 0, unpriced: 0 };
     quoteLines(q).forEach(function (L) {
       if (L.counts) { t.blinds += L.blind; t.addons += L.addons; t.install += L.install; t.qty++; }
       else if (L.w.width || L.w.drop || L.w.name) t.unpriced++;
     });
     t.sub = t.blinds + t.addons + t.install;
-    t.gst = q.gst ? Math.round(t.sub * GST_RATE * 100) / 100 : 0;
+    t.gst = q.gst ? Math.round(t.sub * P.gstRate * 100) / 100 : 0;
     t.total = Math.round((t.sub + t.gst) * 100) / 100;
     return t;
   }
@@ -696,6 +771,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       '<button class="navlink ' + (active === "clients" ? "on" : "") + '" data-go="clients">Clients</button>' +
       '<button class="navlink ' + (active === "quotes" ? "on" : "") + '" data-go="quotes">Quotes</button>' +
       '<button class="navlink ' + (active === "holidays" ? "on" : "") + '" data-go="holidays">Holidays</button>' +
+      '<button class="navlink ' + (active === "prices" ? "on" : "") + '" data-go="prices">Prices</button>' +
       '</nav>' +
       '<div class="topactions">' +
       '<span id="savechip">' + saveChipHTML() + '</span>' +
@@ -1003,6 +1079,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   function renderQuoteEditor() {
     var q = getQuote(state.quoteId);
     if (!q) { state.view = "quotes"; return render(); }
+    var P = pricingForQuote(q);
     var lines = quoteLines(q);
     var T = quoteTotals(q);
     var c = getClient(q.clientId);
@@ -1012,10 +1089,10 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
 
     var rows = lines.map(function (L, i) {
       var w = L.w;
-      var groupOpts = PRICE_GROUPS.map(function (g) {
-        return '<option value="' + esc(g) + '" ' + (g === w.group ? "selected" : "") + '>' + esc(PRICE_TABLES[g].label) + '</option>';
+      var groupOpts = P.groups.map(function (g) {
+        return '<option value="' + esc(g.key) + '" ' + (g.key === w.group ? "selected" : "") + '>' + esc(g.label) + '</option>';
       }).join("");
-      var boxes = ADDONS.map(function (a) {
+      var boxes = P.addons.map(function (a) {
         return '<button type="button" class="chipbox' + (w[a.key] ? " on" : "") + '"' +
           ' data-qtoggle="' + w.id + '" data-qf="' + a.key + '"' +
           ' title="' + esc(a.label) + ' — ' + money(a.price) + '">' +
@@ -1081,8 +1158,8 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
 
       '<div class="card pad totals" id="qtotalbox">' + qTotalsHTML(q) + '</div>' +
 
-      '<p class="hint">Sizes are charged at the next band up on the price list — a 1000 mm width is charged as 1230. ' +
-      'Prices are from the list effective 1 December 2025.</p>' +
+      '<p class="hint">Sizes are charged at the next band up on the price list. ' +
+      esc(quotePriceListNote(q)) + '</p>' +
       '</main>';
   }
 
@@ -1093,20 +1170,21 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       : '<span class="qwarn">' + esc(L.res.error || "") + '</span>';
   }
   function qTotalsHTML(q) {
+    var P = pricingForQuote(q);
     var T = quoteTotals(q);
     return '<div class="togrow">' +
       '<label class="toggle"><input type="checkbox" data-action="q-install" ' + (q.install ? "checked" : "") + '>' +
-      '<span>Installation at ' + money(INSTALL_PER_BLIND) + ' per blind</span></label>' +
+      '<span>Installation at ' + money(P.install) + ' per blind</span></label>' +
       '<label class="toggle"><input type="checkbox" data-action="q-gst" ' + (q.gst ? "checked" : "") + '>' +
-      '<span>Add GST (10%)</span></label>' +
+      '<span>Add GST (' + Math.round(P.gstRate * 100) + '%)</span></label>' +
       '</div>' +
       '<table class="ttable">' +
       '<tr><td>Blinds' + (T.qty ? ' (' + T.qty + ')' : '') + '</td><td class="mono">' + money(T.blinds) + '</td></tr>' +
       (T.addons ? '<tr><td>Extras</td><td class="mono">' + money(T.addons) + '</td></tr>' : '') +
-      (q.install ? '<tr><td>Installation (' + T.qty + ' × ' + money(INSTALL_PER_BLIND) + ')</td><td class="mono">' + money(T.install) + '</td></tr>' : '') +
+      (q.install ? '<tr><td>Installation (' + T.qty + ' × ' + money(P.install) + ')</td><td class="mono">' + money(T.install) + '</td></tr>' : '') +
       (q.gst
         ? '<tr class="tsub"><td>Subtotal (excl GST)</td><td class="mono">' + money(T.sub) + '</td></tr>' +
-          '<tr><td>GST (10%)</td><td class="mono">' + money(T.gst) + '</td></tr>' +
+          '<tr><td>GST (' + Math.round(P.gstRate * 100) + '%)</td><td class="mono">' + money(T.gst) + '</td></tr>' +
           '<tr class="tgrand"><td>Total (incl GST)</td><td class="mono">' + money(T.total) + '</td></tr>'
         : '<tr class="tgrand"><td>Total</td><td class="mono">' + money(T.total) + '</td></tr>' +
           '<tr><td colspan="2" class="exgst">Prices exclude GST</td></tr>') +
@@ -1129,7 +1207,8 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     var row = {
       quote_ref: "", client_id: clients[0] ? clients[0].id : null, job_name: "",
       quote_date: todayISO(), include_install: true, include_gst: false,
-      ordered: false, fabric_notes: "", windows: [blankQuoteWindow()]
+      ordered: false, fabric_notes: "", windows: [blankQuoteWindow()],
+      price_list_id: currentList() ? currentList().id : null
     };
     var r = await db.from("quotes").insert(row).select().single();
     if (r.error) { toast("Could not create quote."); return; }
@@ -1152,17 +1231,18 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   }
 
   function printQuote(q) {
+    var P = pricingForQuote(q);
     var lines = quoteLines(q).filter(function (L) { return L.counts; });
     if (!lines.length) { toast("Nothing priced to print yet."); return; }
     var T = quoteTotals(q);
     var c = getClient(q.clientId);
 
     var rows = lines.map(function (L, i) {
-      var extras = ADDONS.filter(function (a) { return L.w[a.key]; })
+      var extras = P.addons.filter(function (a) { return L.w[a.key]; })
         .map(function (a) { return a.label; }).join(", ");
       return '<tr><td class="ct">' + (i + 1) + '</td>' +
         '<td class="wname">' + esc(L.w.name || "—") + '</td>' +
-        '<td>' + esc(PRICE_TABLES[L.w.group].label) + '</td>' +
+        '<td>' + esc(groupLabel(P, L.w.group)) + '</td>' +
         '<td class="sz">' + esc(L.w.width) + '</td>' +
         '<td class="sz">' + esc(L.w.drop) + '</td>' +
         '<td>' + esc(extras || "—") + '</td>' +
@@ -1190,10 +1270,10 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       '<table class="p-tot">' +
       '<tr><td>Blinds (' + T.qty + ')</td><td class="ra">' + money(T.blinds) + '</td></tr>' +
       (T.addons ? '<tr><td>Extras</td><td class="ra">' + money(T.addons) + '</td></tr>' : '') +
-      (q.install ? '<tr><td>Installation (' + T.qty + ' × ' + money(INSTALL_PER_BLIND) + ')</td><td class="ra">' + money(T.install) + '</td></tr>' : '') +
+      (q.install ? '<tr><td>Installation (' + T.qty + ' × ' + money(P.install) + ')</td><td class="ra">' + money(T.install) + '</td></tr>' : '') +
       (q.gst
         ? '<tr class="sub"><td>Subtotal (excl GST)</td><td class="ra">' + money(T.sub) + '</td></tr>' +
-          '<tr><td>GST (10%)</td><td class="ra">' + money(T.gst) + '</td></tr>' +
+          '<tr><td>GST (' + Math.round(P.gstRate * 100) + '%)</td><td class="ra">' + money(T.gst) + '</td></tr>' +
           '<tr class="grand"><td>Total (incl GST)</td><td class="ra">' + money(T.total) + '</td></tr>'
         : '<tr class="grand"><td>Total</td><td class="ra">' + money(T.total) + '</td></tr>' +
           '<tr><td colspan="2" class="exg">Prices exclude GST</td></tr>') +
@@ -1204,6 +1284,267 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       '<p class="p-foot">SAN Pty Ltd · 55 Lampton Avenue, Derwent Park TAS · Ph 6272 3400 · orders@sanptyltd.com<br>' +
       'Quotation valid for 30 days. All sizes in millimetres.</p>' +
       '</div>');
+  }
+
+
+  /* ============================================================
+     Prices screen — edit the grids, charges and extras
+     ============================================================ */
+  function quotePriceListNote(q) {
+    if (!q.priceListId) return "";
+    for (var i = 0; i < priceLists.length; i++) {
+      if (priceLists[i].id === q.priceListId) {
+        var L = priceLists[i];
+        return "Priced on: " + (L.name || "price list") +
+          (L.effective_from ? " (from " + fmtDate(L.effective_from) + ")" : "") +
+          (L.is_current ? "" : " — superseded, kept so this quote does not change.");
+      }
+    }
+    return "";
+  }
+
+  function renderPricesNotReady() {
+    app.innerHTML = topbar("prices") + '<main class="wrap">' +
+      '<div class="pagehead"><div><h1>Prices</h1></div></div>' +
+      '<div class="empty"><h3>One setup step left</h3>' +
+      '<p>Editable prices need their database table. In Supabase go to <b>SQL Editor → New query</b>, ' +
+      'paste in <b>prices.sql</b> and click <b>Run</b>, then refresh this page.</p></div>' +
+      '</main>' + footer();
+  }
+
+  /* working copy so nothing saves until "Save changes" is pressed */
+  var priceDraft = null, priceDirty = false;
+  function startPriceDraft() {
+    var L = currentList();
+    priceDraft = JSON.parse(JSON.stringify(normalisePricing(L ? L.data : null)));
+    priceDirty = false;
+  }
+  function pd() { if (!priceDraft) startPriceDraft(); return priceDraft; }
+  function markDirty() { priceDirty = true; }
+
+  function renderPrices() {
+    var L = currentList();
+    var P = pd();
+
+    var groupCards = P.groups.map(function (g, gi) {
+      var head = '<tr><th class="cnr">drop \\ width</th>' + g.widths.map(function (w, wi) {
+        return '<th><input class="bandin" type="number" inputmode="numeric" value="' + esc(w) + '" data-pw="' + gi + '" data-wi="' + wi + '"></th>';
+      }).join("") + '<th class="cnr"></th></tr>';
+
+      var body = g.drops.map(function (d, di) {
+        var row = (g.rows[d] || []);
+        return '<tr><th class="rowhd"><input class="bandin" type="number" inputmode="numeric" value="' + esc(d) + '" data-pd="' + gi + '" data-di="' + di + '"></th>' +
+          g.widths.map(function (w, wi) {
+            var v = row[wi];
+            return '<td><input class="cellin' + (typeof v === "number" ? "" : " blankcell") + '" type="number" inputmode="numeric" value="' +
+              (typeof v === "number" ? esc(v) : "") + '" data-pc="' + gi + '" data-di="' + di + '" data-wi="' + wi + '"></td>';
+          }).join("") +
+          '<td class="rowact"><button class="btn small danger-ghost" data-drop-del="' + gi + '_' + di + '" title="Remove this drop row">✕</button></td></tr>';
+      }).join("");
+
+      return '<div class="card pricecard">' +
+        '<div class="cardbar">' +
+        '<input class="grouplabel" value="' + esc(g.label) + '" data-pg="' + gi + '" placeholder="Blind type name">' +
+        '<button class="btn small danger-ghost" data-group-del="' + gi + '">Remove blind type</button>' +
+        '</div>' +
+        '<div class="gridscroll"><table class="pricegrid">' +
+        '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+        '<div class="entryfoot">' +
+        '<div class="btnrow">' +
+        '<button class="btn small" data-width-add="' + gi + '">+ Width column</button>' +
+        '<button class="btn small" data-drop-add="' + gi + '">+ Drop row</button>' +
+        '<button class="btn small danger-ghost" data-width-del="' + gi + '">− Last width</button>' +
+        '</div>' +
+        '<span class="count">' + g.widths.length + ' widths × ' + g.drops.length + ' drops</span>' +
+        '</div></div>';
+    }).join("");
+
+    var addonRows = P.addons.map(function (a, ai) {
+      return '<tr>' +
+        '<td><input value="' + esc(a.label) + '" data-pa="' + ai + '" data-pf="label" placeholder="Full name (printed)"></td>' +
+        '<td><input value="' + esc(a.short || "") + '" data-pa="' + ai + '" data-pf="short" placeholder="Short (on screen)"></td>' +
+        '<td><input class="mono num" type="number" inputmode="numeric" value="' + esc(a.price) + '" data-pa="' + ai + '" data-pf="price"></td>' +
+        '<td class="rowact"><button class="btn small danger-ghost" data-addon-del="' + ai + '">✕</button></td></tr>';
+    }).join("");
+
+    app.innerHTML = topbar("prices") +
+      '<main class="wrap">' +
+      '<div class="pagehead">' +
+      '<div><h1>Prices</h1><p class="sub">' +
+      (L ? esc(L.name || "Price list") + (L.effective_from ? ' · effective ' + esc(fmtDate(L.effective_from)) : '') : 'No price list') +
+      '</p></div>' +
+      '<div class="headctrls">' +
+      (priceDirty ? '<span class="chip warnchip">Unsaved changes</span>' : '') +
+      '<button class="btn" data-action="price-revert">Undo changes</button>' +
+      '<button class="btn primary" data-action="price-save">Save changes</button>' +
+      '</div></div>' +
+
+      '<div class="card pad">' +
+      '<div class="formgrid">' +
+      '<label class="fld"><span>Installation, per blind</span><input class="mono" type="number" inputmode="numeric" value="' + esc(P.install) + '" data-pset="install"></label>' +
+      '<label class="fld"><span>GST rate (%)</span><input class="mono" type="number" inputmode="numeric" value="' + esc(Math.round(P.gstRate * 1000) / 10) + '" data-pset="gst"></label>' +
+      '</div></div>' +
+
+      '<h2 class="sec">Extras</h2>' +
+      '<div class="card">' +
+      '<table class="grid"><thead><tr><th>Name on printed quote</th><th>Short name on screen</th><th class="ralign">Price</th><th></th></tr></thead>' +
+      '<tbody>' + addonRows + '</tbody></table>' +
+      '<div class="entryfoot"><button class="btn small" data-action="addon-add">+ Add extra</button>' +
+      '<span class="count">' + P.addons.length + ' extras</span></div></div>' +
+
+      '<h2 class="sec">Blind types &amp; price grids</h2>' +
+      groupCards +
+      '<div style="margin-top:14px"><button class="btn" data-action="group-add">+ Add blind type</button></div>' +
+
+      '<div class="card pad" style="margin-top:22px">' +
+      '<b>Putting up a new price list</b>' +
+      '<p class="hint" style="margin:8px 0 0">Editing above changes the current list, so <b>every quote using it reprices</b> — right for correcting a mistake. ' +
+      'When SAN issues new prices, use <b>Start a new price list</b> instead: quotes already written keep their old prices, and new quotes use the new ones.</p>' +
+      '<div class="btnrow" style="margin-top:14px">' +
+      '<input class="fld-inline" id="pl-name" placeholder="e.g. SAN price list 2027" value="">' +
+      '<input class="fld-inline" id="pl-date" type="date" value="' + esc(todayISO()) + '">' +
+      '<button class="btn primary" data-action="price-newlist">Start a new price list</button>' +
+      '</div>' +
+      (priceLists.length > 1
+        ? '<p class="hint" style="margin-top:14px">Earlier lists kept on file: ' +
+          priceLists.filter(function (x) { return !x.is_current; }).map(function (x) {
+            return esc(x.name || "list") + (x.effective_from ? " (" + esc(fmtDate(x.effective_from)) + ")" : "");
+          }).join(" · ") + '</p>'
+        : '') +
+      '</div>' +
+      '</main>' + footer();
+  }
+
+  /* ---- price editing actions ---- */
+  function priceInput(el) {
+    var P = pd(), v = el.value;
+    if (el.hasAttribute("data-pset")) {
+      if (el.getAttribute("data-pset") === "install") P.install = Number(v) || 0;
+      else P.gstRate = (Number(v) || 0) / 100;
+      markDirty(); return true;
+    }
+    if (el.hasAttribute("data-pg")) { P.groups[+el.getAttribute("data-pg")].label = v; markDirty(); return true; }
+    if (el.hasAttribute("data-pa")) {
+      var a = P.addons[+el.getAttribute("data-pa")], f = el.getAttribute("data-pf");
+      a[f] = (f === "price") ? (Number(v) || 0) : v;
+      markDirty(); return true;
+    }
+    if (el.hasAttribute("data-pw")) {
+      var g1 = P.groups[+el.getAttribute("data-pw")];
+      g1.widths[+el.getAttribute("data-wi")] = Number(v) || 0;
+      markDirty(); return true;
+    }
+    if (el.hasAttribute("data-pd")) {
+      var g2 = P.groups[+el.getAttribute("data-pd")], di = +el.getAttribute("data-di");
+      var oldD = g2.drops[di], newD = Number(v) || 0;
+      if (oldD !== newD) {
+        var rowVals = g2.rows[oldD];
+        delete g2.rows[oldD];
+        g2.drops[di] = newD;
+        g2.rows[newD] = rowVals;
+      }
+      markDirty(); return true;
+    }
+    if (el.hasAttribute("data-pc")) {
+      var g3 = P.groups[+el.getAttribute("data-pc")];
+      var d3 = g3.drops[+el.getAttribute("data-di")];
+      if (!g3.rows[d3]) g3.rows[d3] = [];
+      g3.rows[d3][+el.getAttribute("data-wi")] = (String(v).trim() === "") ? null : (Number(v) || 0);
+      markDirty(); return true;
+    }
+    return false;
+  }
+
+  function priceClick(t) {
+    var P = pd(), m;
+    if (t.hasAttribute("data-width-add")) {
+      var g = P.groups[+t.getAttribute("data-width-add")];
+      var last = g.widths[g.widths.length - 1] || 0;
+      g.widths.push(last + 300);
+      g.drops.forEach(function (d) { (g.rows[d] = g.rows[d] || []).push(null); });
+      markDirty(); render(); return true;
+    }
+    if (t.hasAttribute("data-width-del")) {
+      var g2 = P.groups[+t.getAttribute("data-width-del")];
+      if (g2.widths.length <= 1) { toast("A grid needs at least one width."); return true; }
+      g2.widths.pop();
+      g2.drops.forEach(function (d) { if (g2.rows[d]) g2.rows[d].pop(); });
+      markDirty(); render(); return true;
+    }
+    if (t.hasAttribute("data-drop-add")) {
+      var g3 = P.groups[+t.getAttribute("data-drop-add")];
+      var lastD = g3.drops[g3.drops.length - 1] || 0;
+      var nd = lastD + 300;
+      g3.drops.push(nd);
+      g3.rows[nd] = g3.widths.map(function () { return null; });
+      markDirty(); render(); return true;
+    }
+    if (t.hasAttribute("data-drop-del")) {
+      m = t.getAttribute("data-drop-del").split("_");
+      var g4 = P.groups[+m[0]], di = +m[1];
+      if (g4.drops.length <= 1) { toast("A grid needs at least one drop."); return true; }
+      var dv = g4.drops[di];
+      if (!confirm("Remove the " + dv + " mm drop row?")) return true;
+      g4.drops.splice(di, 1); delete g4.rows[dv];
+      markDirty(); render(); return true;
+    }
+    if (t.hasAttribute("data-group-del")) {
+      var gi = +t.getAttribute("data-group-del");
+      if (P.groups.length <= 1) { toast("Keep at least one blind type."); return true; }
+      if (!confirm('Remove "' + P.groups[gi].label + '"?\n\nQuotes already written keep their prices, but you will not be able to pick this type on new ones.')) return true;
+      P.groups.splice(gi, 1); markDirty(); render(); return true;
+    }
+    if (t.hasAttribute("data-addon-del")) {
+      P.addons.splice(+t.getAttribute("data-addon-del"), 1); markDirty(); render(); return true;
+    }
+    return false;
+  }
+
+  function addAddon() {
+    var P = pd();
+    P.addons.push({ key: "x" + Date.now().toString(36), label: "New extra", short: "New", price: 0 });
+    markDirty(); render();
+  }
+  function addGroup() {
+    var P = pd();
+    var base = P.groups[0];
+    var widths = base ? base.widths.slice() : [630, 930, 1230];
+    var drops = base ? base.drops.slice() : [900, 1200, 1500];
+    var rows = {};
+    drops.forEach(function (d) { rows[d] = widths.map(function () { return null; }); });
+    P.groups.push({ key: "grp" + Date.now().toString(36), label: "New blind type", widths: widths, drops: drops, rows: rows });
+    markDirty(); render();
+  }
+
+  async function savePrices() {
+    var L = currentList();
+    if (!L) { toast("No price list to save to."); return; }
+    var r = await db.from("price_lists").update({ data: pd() }).eq("id", L.id);
+    if (r.error) { toast("Could not save prices."); return; }
+    L.data = JSON.parse(JSON.stringify(pd()));
+    priceDirty = false; render(); toast("Prices saved.");
+  }
+  function revertPrices() {
+    if (priceDirty && !confirm("Undo your changes and go back to the saved prices?")) return;
+    startPriceDraft(); render();
+  }
+  async function newPriceList() {
+    var name = (document.getElementById("pl-name") || {}).value || "";
+    var from = (document.getElementById("pl-date") || {}).value || todayISO();
+    if (!name.trim()) { toast("Give the new price list a name first."); return; }
+    if (!confirm('Start "' + name + '"?\n\nQuotes already written keep their current prices. New quotes will use this list.')) return;
+    var r = await db.from("price_lists").insert({
+      name: name, effective_from: from, is_current: true, data: pd()
+    }).select().single();
+    if (r.error) { toast("Could not create the new price list."); return; }
+    var old = currentList();
+    if (old) {
+      var r2 = await db.from("price_lists").update({ is_current: false }).eq("id", old.id);
+      if (!r2.error) old.is_current = false;
+    }
+    priceLists.unshift(r.data);
+    priceDirty = false; startPriceDraft(); render();
+    toast("New price list started.");
   }
 
   /* ---------- printing ---------- */
@@ -1470,8 +1811,11 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
       "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday]," +
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
-      "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear],.m-close,[data-msave]");
+      "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
+      "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
+      "[data-group-del],[data-addon-del],.m-close,[data-msave]");
     if (!t) return;
+    if (priceClick(t)) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
     else if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); render(); }
     else if (t.hasAttribute("data-edit")) { state.view = "job"; state.jobId = t.getAttribute("data-edit"); state.tab = "info"; render(); }
@@ -1524,6 +1868,11 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
       else if (a === "print-labels") printLabels(getJob(state.jobId));
       else if (a === "addholiday") addHoliday();
+      else if (a === "price-save") savePrices();
+      else if (a === "price-revert") revertPrices();
+      else if (a === "price-newlist") newPriceList();
+      else if (a === "addon-add") addAddon();
+      else if (a === "group-add") addGroup();
       else if (a === "new-quote") newQuote();
       else if (a === "add-qw") {
         var qa = getQuote(state.quoteId);
@@ -1545,6 +1894,11 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   document.addEventListener("input", function (e) {
     var el = e.target;
     if (el.hasAttribute && el.hasAttribute("data-search")) { state.search = el.value; renderDashboardKeepFocus(); return; }
+    if (state.view === "prices" && priceInput(el)) {
+      var chip = document.querySelector(".warnchip");
+      if (!chip) { var hc = document.querySelector(".headctrls"); if (hc && priceDirty) render(); }
+      return;
+    }
     if (el.hasAttribute("data-qsearch")) { state.quoteSearch = el.value; renderQuotesKeepFocus(); return; }
     if (el.hasAttribute("data-q-field")) {
       var qf = getQuote(state.quoteId);
