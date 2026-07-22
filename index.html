@@ -195,6 +195,10 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
   border-radius:9px;background:#f7f9fb;color:#3c4a5a;margin:4px 0 12px}
 .linkrow{display:flex;gap:9px;flex-wrap:wrap}
 .tiny{font-size:12px;margin:12px 0 0}
+.modes{display:inline-flex;background:#eef2f6;border-radius:10px;padding:3px;margin-bottom:16px}
+.modebtn{border:0;background:transparent;padding:7px 15px;border-radius:8px;cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:600;color:var(--dim)}
+.modebtn.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(16,32,48,.12)}
 </style>
 </head>
 <body>
@@ -490,18 +494,48 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
   }
 
   function renderHolidays() {
+    var mode = state.holidayMode === "range" ? "range" : "single";
+    var counts = {};
+    holidays.forEach(function (h) {
+      var k = (h.name || "").trim();
+      if (k) counts[k] = (counts[k] || 0) + 1;
+    });
+    var seen = {};
     var rows = holidays.map(function (h) {
+      var k = (h.name || "").trim();
+      var groupBtn = "";
+      if (k && counts[k] > 1 && !seen[k]) {
+        seen[k] = true;
+        groupBtn = '<button class="btn small danger-ghost" data-del-hgroup="' + esc(k) +
+          '" title="Remove all ' + counts[k] + ' dates named ' + esc(k) + '">Remove all ' + counts[k] + '</button>';
+      }
       return '<tr><td class="mono">' + esc(fmtDate(h.day)) + '</td><td>' + esc(h.name || "") + '</td>' +
-        '<td class="rowact"><button class="btn small danger-ghost" data-del-holiday="' + h.id + '">Remove</button></td></tr>';
+        '<td class="rowact">' + groupBtn +
+        '<button class="btn small danger-ghost" data-del-holiday="' + h.id + '">Remove</button></td></tr>';
     }).join("");
+
+    var inputs = mode === "single"
+      ? '<label class="fld"><span>Date</span><input id="h-date" type="date"></label>'
+      : '<label class="fld"><span>First day off</span><input id="h-from" type="date"></label>' +
+        '<label class="fld"><span>Last day off</span><input id="h-to" type="date"></label>';
+
     app.innerHTML = topbar("holidays") + '<main class="wrap"><div class="pagehead">' +
-      '<div><h1>Public holidays</h1><p class="sub">Dates here are skipped in the 25-working-day completion estimate</p></div></div>' +
-      '<div class="card pad"><div class="addholiday">' +
-      '<label class="fld"><span>Date</span><input id="h-date" type="date"></label>' +
-      '<label class="fld"><span>Name (optional)</span><input id="h-name" placeholder="e.g. Hobart Show Day"></label>' +
-      '<button class="btn primary" data-action="addholiday">Add holiday</button></div>' +
-      (holidays.length ? '<table class="grid" style="margin-top:16px"><thead><tr><th>Date</th><th>Name</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
-        : '<p class="hint">No holidays added yet.</p>') +
+      '<div><h1>Public holidays &amp; shutdowns</h1><p class="sub">Dates here are skipped in the 25-working-day completion estimate</p></div></div>' +
+      '<div class="card pad">' +
+      '<div class="modes">' +
+      '<button class="modebtn ' + (mode === "single" ? "on" : "") + '" data-action="hmode-single">One day</button>' +
+      '<button class="modebtn ' + (mode === "range" ? "on" : "") + '" data-action="hmode-range">Date range</button>' +
+      '</div>' +
+      '<div class="addholiday">' + inputs +
+      '<label class="fld"><span>Name (optional)</span><input id="h-name" placeholder="' +
+      (mode === "range" ? "e.g. Christmas shutdown" : "e.g. Hobart Show Day") + '"></label>' +
+      '<button class="btn primary" data-action="addholiday">' + (mode === "range" ? "Add range" : "Add day") + '</button></div>' +
+      (mode === "range"
+        ? '<p class="hint">Enter the first and last day you are closed. Weekends are skipped automatically, so only the weekdays in between get added. Give it a name and you can remove the whole lot in one click later.</p>'
+        : '') +
+      (holidays.length
+        ? '<table class="grid" style="margin-top:16px"><thead><tr><th>Date</th><th>Name</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<p class="hint">No dates added yet.</p>') +
       '</div></main>' + footer();
   }
 
@@ -669,14 +703,62 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
     clients = clients.filter(function (x) { return x.id !== id; }); render();
   }
 
+  function weekdaysBetween(fromISO, toISO) {
+    var out = [], d = new Date(fromISO + "T00:00:00"), end = new Date(toISO + "T00:00:00"), guard = 0;
+    if (isNaN(d) || isNaN(end)) return out;
+    while (d <= end && guard++ < 400) {
+      var g = d.getDay();
+      if (g !== 0 && g !== 6) out.push(localISO(d));
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }
+  function val(id) { var el = document.getElementById(id); return el ? el.value : ""; }
+
   async function addHoliday() {
-    var d = document.getElementById("h-date").value;
-    var nm = document.getElementById("h-name").value;
-    if (!d) { toast("Pick a date first."); return; }
-    var r = await db.from("holidays").insert({ day: d, name: nm }).select().single();
-    if (r.error) { toast("Could not add holiday."); return; }
-    holidays.push(r.data); holidays.sort(function (a, b) { return a.day < b.day ? -1 : 1; });
+    var mode = state.holidayMode === "range" ? "range" : "single";
+    var nm = val("h-name");
+    var wanted = [];
+
+    if (mode === "single") {
+      var d = val("h-date");
+      if (!d) { toast("Pick a date first."); return; }
+      wanted = [d];
+    } else {
+      var from = val("h-from"), to = val("h-to");
+      if (!from || !to) { toast("Pick both a first and last day."); return; }
+      if (to < from) { toast("The last day is before the first day."); return; }
+      wanted = weekdaysBetween(from, to);
+      if (!wanted.length) { toast("That range is all weekend — nothing to add."); return; }
+      if (wanted.length > 60) { toast("That range is very long. Please keep it under 60 weekdays."); return; }
+    }
+
+    var have = {};
+    holidays.forEach(function (h) { have[h.day] = true; });
+    var fresh = wanted.filter(function (d) { return !have[d]; });
+    var already = wanted.length - fresh.length;
+    if (!fresh.length) { toast("Those dates are already in the list."); return; }
+
+    var r = await db.from("holidays")
+      .insert(fresh.map(function (d) { return { day: d, name: nm }; }))
+      .select();
+    if (r.error) { toast("Could not add those dates."); return; }
+
+    holidays = holidays.concat(r.data || []);
+    holidays.sort(function (a, b) { return a.day < b.day ? -1 : 1; });
     rebuildHolidaySet(); render();
+    toast(fresh.length + " date" + (fresh.length === 1 ? "" : "s") + " added" +
+      (already ? " (" + already + " already there)" : "") + ".");
+  }
+  async function deleteHolidayGroup(name) {
+    var group = holidays.filter(function (h) { return (h.name || "").trim() === name; });
+    if (!group.length) return;
+    if (!confirm("Remove all " + group.length + " dates named \u201c" + name + "\u201d?")) return;
+    var r = await db.from("holidays").delete().eq("name", name);
+    if (r.error) { toast("Could not remove those dates."); return; }
+    holidays = holidays.filter(function (h) { return (h.name || "").trim() !== name; });
+    rebuildHolidaySet(); render();
+    toast(group.length + " dates removed.");
   }
   async function deleteHoliday(id) {
     var r = await db.from("holidays").delete().eq("id", id);
@@ -779,7 +861,7 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
       "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday]," +
-      "[data-link-client],[data-copy-link],[data-newtoken],.m-close,[data-msave]");
+      "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],.m-close,[data-msave]");
     if (!t) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
     else if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); render(); }
@@ -791,6 +873,7 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
     else if (t.hasAttribute("data-del-job")) deleteJob(t.getAttribute("data-del-job"));
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
     else if (t.hasAttribute("data-del-holiday")) deleteHoliday(t.getAttribute("data-del-holiday"));
+    else if (t.hasAttribute("data-del-hgroup")) deleteHolidayGroup(t.getAttribute("data-del-hgroup"));
     else if (t.hasAttribute("data-del-win")) {
       var job = getJob(state.jobId);
       job.windows = job.windows.filter(function (x) { return x.id !== t.getAttribute("data-del-win"); });
@@ -809,6 +892,8 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
       else if (a === "print-labels") printLabels(getJob(state.jobId));
       else if (a === "addholiday") addHoliday();
+      else if (a === "hmode-single") { state.holidayMode = "single"; render(); }
+      else if (a === "hmode-range") { state.holidayMode = "range"; render(); }
       else if (a === "export") exportData();
       else if (a === "login") doLogin();
       else if (a === "signout") doSignOut();
