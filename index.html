@@ -347,6 +347,9 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   .motsec h3{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px}
   .p-grid .ct{text-align:center}
 }
+.curtaingrid td{vertical-align:middle}
+.curtaingrid select.fabricsel{width:100%;min-width:230px;padding:9px 11px;border:1px solid var(--line);
+  border-radius:8px;font-family:inherit;font-size:14.5px;background:#fff}
 </style>
 </head>
 <body>
@@ -430,6 +433,21 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   ];
   var GST_RATE = 0.10;
 
+  /* S-Fold curtain fabrics, priced per lineal metre of window width */
+  var CURTAIN_FABRICS = [
+    { key: "bali", label: "Bali", rate: 350 },
+    { key: "romeo", label: "Romeo", rate: 350 },
+    { key: "vevey", label: "Vevey", rate: 350 },
+    { key: "homestead", label: "Homestead", rate: 360 },
+    { key: "marley", label: "Marley", rate: 360 },
+    { key: "rio", label: "Rio", rate: 360 },
+    { key: "epic", label: "Epic", rate: 450 },
+    { key: "sicily", label: "Sicily", rate: 380 },
+    { key: "galaxy", label: "Galaxy", rate: 450 },
+    { key: "noble", label: "Noble", rate: 450 },
+    { key: "belmore", label: "Belmore", rate: 450 }
+  ];
+
   /* SAN motorisation list — editable on the Prices tab once set up */
   var MOTOR_ITEMS = [
     { key: "m11", label: "1.1 Motor Only", price: 220 },
@@ -464,6 +482,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       install: INSTALL_PER_BLIND, gstRate: GST_RATE,
       addons: ADDONS.map(function (a) { return { key: a.key, label: a.label, short: a.short, price: a.price }; }),
       motors: MOTOR_ITEMS.map(function (m) { return { key: m.key, label: m.label, price: m.price }; }),
+      fabrics: CURTAIN_FABRICS.map(function (f) { return { key: f.key, label: f.label, rate: f.rate }; }),
       groups: groups
     };
   }
@@ -475,6 +494,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       gstRate: isFinite(Number(d.gstRate)) ? Number(d.gstRate) : 0.10,
       addons: Array.isArray(d.addons) ? d.addons : [],
       motors: Array.isArray(d.motors) ? d.motors : MOTOR_ITEMS.slice(),
+      fabrics: Array.isArray(d.fabrics) ? d.fabrics : CURTAIN_FABRICS.slice(),
       groups: d.groups
     };
   }
@@ -716,6 +736,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       fabricNotes: r.fabric_notes || "",
       priceListId: r.price_list_id || null,
       motorisation: Array.isArray(r.motorisation) ? r.motorisation : [],
+      curtains: Array.isArray(r.curtains) ? r.curtains : [],
       windows: Array.isArray(r.windows) && r.windows.length ? r.windows : [blankQuoteWindow()]
     };
   }
@@ -723,7 +744,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     ref: "quote_ref", clientId: "client_id", jobName: "job_name", date: "quote_date",
     install: "include_install", gst: "include_gst", ordered: "ordered",
     orderedDate: "ordered_date", fabricNotes: "fabric_notes", windows: "windows",
-    motorisation: "motorisation"
+    motorisation: "motorisation", curtains: "curtains"
   };
   function getQuote(id) { return quotes.filter(function (q) { return q.id === id; })[0]; }
 
@@ -807,16 +828,49 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     return n;
   }
 
+  function fabricOf(P, key) {
+    var list = P.fabrics || [];
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i];
+    return null;
+  }
+  function curtainLines(q) {
+    var P = pricingForQuote(q);
+    return (q.curtains || []).map(function (c) {
+      var f = fabricOf(P, c.fabric);
+      var mm = Number(c.width);
+      var metres = (isFinite(mm) && mm > 0) ? mm / 1000 : 0;
+      var rated = !!(f && typeof f.rate === "number");
+      var priced = rated && metres > 0;
+      return { row: c, fab: f, metres: metres, rate: rated ? f.rate : null,
+               total: priced ? Math.round(f.rate * metres * 100) / 100 : 0, priced: priced };
+    });
+  }
+  function curtainTotal(q) {
+    var t = 0;
+    curtainLines(q).forEach(function (L) { if (L.priced) t += L.total; });
+    return Math.round(t * 100) / 100;
+  }
+  function curtainIncomplete(q) {
+    var n = 0;
+    curtainLines(q).forEach(function (L) {
+      if ((L.row.fabric || L.row.width || L.row.name) && !L.priced) n++;
+    });
+    return n;
+  }
+
   function quoteTotals(q) {
     var P = pricingForQuote(q);
-    var t = { blinds: 0, addons: 0, install: 0, motors: 0, motorUnpriced: 0, qty: 0, sub: 0, gst: 0, total: 0, unpriced: 0 };
+    var t = { blinds: 0, addons: 0, install: 0, motors: 0, motorUnpriced: 0, curtains: 0, curtainIncomplete: 0,
+              qty: 0, sub: 0, gst: 0, total: 0, unpriced: 0 };
     quoteLines(q).forEach(function (L) {
       if (L.counts) { t.blinds += L.blind; t.addons += L.addons; t.install += L.install; t.qty++; }
       else if (L.w.width || L.w.drop || L.w.name) t.unpriced++;
     });
     t.motors = motorTotal(q);
     t.motorUnpriced = motorUnpriced(q);
-    t.sub = t.blinds + t.addons + t.install + t.motors;
+    t.curtains = curtainTotal(q);
+    t.curtainIncomplete = curtainIncomplete(q);
+    t.sub = t.blinds + t.addons + t.install + t.motors + t.curtains;
     t.gst = q.gst ? Math.round(t.sub * P.gstRate * 100) / 100 : 0;
     t.total = Math.round((t.sub + t.gst) * 100) / 100;
     return t;
@@ -1213,6 +1267,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       '</div></div>' +
 
       motorSectionHTML(q, P) +
+      curtainSectionHTML(q, P) +
 
       '<div class="card pad" style="margin-top:16px">' +
       '<label class="fld wide" style="margin-top:0"><span>Fabric / colour notes</span>' +
@@ -1264,6 +1319,43 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       '</div></div>';
   }
 
+  function curtainSectionHTML(q, P) {
+    var fabrics = P.fabrics || [];
+    if (!fabrics.length) return "";
+    var lines = curtainLines(q);
+    var rows = lines.map(function (L, i) {
+      var opts = '<option value="">— choose a fabric —</option>' + fabrics.map(function (f) {
+        return '<option value="' + esc(f.key) + '" ' + (f.key === L.row.fabric ? "selected" : "") + '>' +
+          esc(f.label) + (typeof f.rate === "number" ? " — " + money(f.rate) + "/m" : "  (no rate set)") + '</option>';
+      }).join("");
+      var metres = L.metres > 0 ? '<span class="mono">' + L.metres.toFixed(2) + ' m</span>' : '';
+      var rate = L.rate !== null ? '<span class="mono">' + money(L.rate) + '</span>' : '';
+      return '<tr>' +
+        '<td class="idx">' + (i + 1) + '</td>' +
+        '<td><input value="' + esc(L.row.name || "") + '" placeholder="Window name" data-cu="' + L.row.id + '" data-cf2="name"></td>' +
+        '<td><select class="fabricsel" data-cu="' + L.row.id + '" data-cf2="fabric">' + opts + '</select></td>' +
+        '<td><input class="mono num" type="number" inputmode="numeric" value="' + esc(L.row.width || "") + '" placeholder="mm" data-cu="' + L.row.id + '" data-cf2="width"></td>' +
+        '<td class="ralign">' + metres + '</td>' +
+        '<td class="ralign">' + rate + '</td>' +
+        '<td class="ralign">' + (L.priced ? '<span class="qprice">' + money(L.total) + '</span>' : '') + '</td>' +
+        '<td class="rowact"><button class="btn small danger-ghost" data-cu-del="' + L.row.id + '" title="Remove">✕</button></td>' +
+        '</tr>';
+    }).join("");
+
+    return '<div class="card" style="margin-top:16px">' +
+      '<div class="cardbar"><div><b>S-Fold Curtains</b> <span class="dim">— charged per lineal metre of window width</span></div></div>' +
+      (lines.length
+        ? '<table class="grid entry curtaingrid"><thead><tr>' +
+          '<th class="idx">#</th><th>Window</th><th>Fabric</th><th>Width (mm)</th>' +
+          '<th class="ralign">Metres</th><th class="ralign">Per m</th><th class="ralign">Price</th><th></th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<p class="hint" style="padding:16px 18px;margin:0">Nothing added. Use the button below if this job includes S-Fold curtains.</p>') +
+      '<div class="entryfoot">' +
+      '<button class="btn primary" data-action="add-curtain">+ Add curtain</button>' +
+      (curtainTotal(q) ? '<span class="count">' + money(curtainTotal(q)) + ' total</span>' : '') +
+      '</div></div>';
+  }
+
   function qPriceHTML(L) {
     return L.counts
       ? '<span class="qprice">' + money(L.total) + '</span><div class="qband">charged as ' +
@@ -1284,6 +1376,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       (T.addons ? '<tr><td>Extras</td><td class="mono">' + money(T.addons) + '</td></tr>' : '') +
       (q.install ? '<tr><td>Installation (' + T.qty + ' × ' + money(P.install) + ')</td><td class="mono">' + money(T.install) + '</td></tr>' : '') +
       (T.motors ? '<tr><td>Motorisation</td><td class="mono">' + money(T.motors) + '</td></tr>' : '') +
+      (T.curtains ? '<tr><td>S-Fold curtains</td><td class="mono">' + money(T.curtains) + '</td></tr>' : '') +
       (q.gst
         ? '<tr class="tsub"><td>Subtotal (excl GST)</td><td class="mono">' + money(T.sub) + '</td></tr>' +
           '<tr><td>GST (' + Math.round(P.gstRate * 100) + '%)</td><td class="mono">' + money(T.gst) + '</td></tr>' +
@@ -1295,7 +1388,10 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
         ' not priced yet — check the sizes marked in red above.</p>' : '') +
       (T.motorUnpriced ? '<p class="qwarn2">' + T.motorUnpriced + ' motorisation item' +
         (T.motorUnpriced === 1 ? " has" : "s have") + ' no price set — add one on the Prices tab, ' +
-        'or it will be left off the quote.</p>' : '');
+        'or it will be left off the quote.</p>' : '') +
+      (T.curtainIncomplete ? '<p class="qwarn2">' + T.curtainIncomplete + ' curtain' +
+        (T.curtainIncomplete === 1 ? " is" : "s are") + ' missing a fabric or width, so ' +
+        (T.curtainIncomplete === 1 ? "it is" : "they are") + ' left off the quote.</p>' : '');
   }
   /* Update prices in place while typing — never re-render, so the
      cursor stays exactly where the user put it. */
@@ -1306,6 +1402,24 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     });
     var box = document.getElementById("qtotalbox");
     if (box) box.innerHTML = qTotalsHTML(q);
+  }
+
+  function curtainPrintHTML(q) {
+    var lines = curtainLines(q).filter(function (L) { return L.priced; });
+    if (!lines.length) return "";
+    var rows = lines.map(function (L, i) {
+      return '<tr><td class="ct">' + (i + 1) + '</td>' +
+        '<td class="wname">' + esc(L.row.name || "—") + '</td>' +
+        '<td>' + esc(L.fab.label) + '</td>' +
+        '<td class="sz">' + esc(L.row.width) + '</td>' +
+        '<td class="ra">' + L.metres.toFixed(2) + ' m</td>' +
+        '<td class="ra">' + money(L.rate) + '</td>' +
+        '<td class="ra">' + money(L.total) + '</td></tr>';
+    }).join("");
+    return '<div class="motsec"><h3>S-Fold Curtains</h3>' +
+      '<table class="p-grid qgrid"><thead><tr><th class="ct">#</th><th>Window</th><th>Fabric</th>' +
+      '<th class="sz">Width</th><th class="ra">Metres</th><th class="ra">Per m</th><th class="ra">Price</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
   function motorPrintHTML(q) {
@@ -1326,7 +1440,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     var row = {
       quote_ref: "", client_id: clients[0] ? clients[0].id : null, job_name: "",
       quote_date: todayISO(), include_install: true, include_gst: false,
-      ordered: false, fabric_notes: "", windows: [blankQuoteWindow()], motorisation: [],
+      ordered: false, fabric_notes: "", windows: [blankQuoteWindow()], motorisation: [], curtains: [],
       price_list_id: currentList() ? currentList().id : null
     };
     var r = await db.from("quotes").insert(row).select().single();
@@ -1391,6 +1505,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       (T.addons ? '<tr><td>Extras</td><td class="ra">' + money(T.addons) + '</td></tr>' : '') +
       (q.install ? '<tr><td>Installation (' + T.qty + ' × ' + money(P.install) + ')</td><td class="ra">' + money(T.install) + '</td></tr>' : '') +
       (T.motors ? '<tr><td>Motorisation</td><td class="ra">' + money(T.motors) + '</td></tr>' : '') +
+      (T.curtains ? '<tr><td>S-Fold curtains</td><td class="ra">' + money(T.curtains) + '</td></tr>' : '') +
       (q.gst
         ? '<tr class="sub"><td>Subtotal (excl GST)</td><td class="ra">' + money(T.sub) + '</td></tr>' +
           '<tr><td>GST (' + Math.round(P.gstRate * 100) + '%)</td><td class="ra">' + money(T.gst) + '</td></tr>' +
@@ -1399,6 +1514,7 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
           '<tr><td colspan="2" class="exg">Prices exclude GST</td></tr>') +
       '</table>' +
 
+      curtainPrintHTML(q) +
       motorPrintHTML(q) +
       '<div class="fabsec"><h3>Fabric / colour</h3>' + fabric + '</div>' +
 
@@ -1480,6 +1596,14 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
         '</div></div>';
     }).join("");
 
+    var fabricRows = (P.fabrics || []).map(function (f, fi) {
+      return '<tr>' +
+        '<td><input value="' + esc(f.label) + '" data-pfab="' + fi + '" data-pf="label" placeholder="Fabric name"></td>' +
+        '<td><input class="mono num' + (typeof f.rate === "number" ? "" : " blankcell") + '" type="number" inputmode="numeric" value="' +
+          (typeof f.rate === "number" ? esc(f.rate) : "") + '" placeholder="not set" data-pfab="' + fi + '" data-pf="rate"></td>' +
+        '<td class="rowact"><button class="btn small danger-ghost" data-fabric-del="' + fi + '">✕</button></td></tr>';
+    }).join("");
+
     var missingMotorPrices = (P.motors || []).filter(function (m) { return typeof m.price !== "number"; }).length;
     var motorRows = (P.motors || []).map(function (m, mi) {
       return '<tr>' +
@@ -1522,6 +1646,13 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       '<div class="entryfoot"><button class="btn small" data-action="addon-add">+ Add extra</button>' +
       '<span class="count">' + P.addons.length + ' extras</span></div></div>' +
 
+      '<h2 class="sec">S-Fold curtain fabrics</h2>' +
+      '<div class="card">' +
+      '<table class="grid"><thead><tr><th>Fabric</th><th class="ralign">Per lineal metre</th><th></th></tr></thead>' +
+      '<tbody>' + fabricRows + '</tbody></table>' +
+      '<div class="entryfoot"><button class="btn small" data-action="fabric-add">+ Add fabric</button>' +
+      '<span class="count">' + (P.fabrics || []).length + ' fabrics</span></div></div>' +
+
       '<h2 class="sec">Motorisation</h2>' +
       '<div class="card">' +
       '<table class="grid"><thead><tr><th>Item</th><th class="ralign">Price</th><th></th></tr></thead>' +
@@ -1562,6 +1693,12 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       markDirty(); return true;
     }
     if (el.hasAttribute("data-pg")) { P.groups[+el.getAttribute("data-pg")].label = v; markDirty(); return true; }
+    if (el.hasAttribute("data-pfab")) {
+      var ff = P.fabrics[+el.getAttribute("data-pfab")], ffld = el.getAttribute("data-pf");
+      if (ffld === "rate") ff.rate = (String(v).trim() === "") ? null : (Number(v) || 0);
+      else ff[ffld] = v;
+      markDirty(); return true;
+    }
     if (el.hasAttribute("data-pm")) {
       var mm = P.motors[+el.getAttribute("data-pm")], mf = el.getAttribute("data-pf");
       if (mf === "price") mm.price = (String(v).trim() === "") ? null : (Number(v) || 0);
@@ -1638,6 +1775,9 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       if (!confirm('Remove "' + P.groups[gi].label + '"?\n\nQuotes already written keep their prices, but you will not be able to pick this type on new ones.')) return true;
       P.groups.splice(gi, 1); markDirty(); render(); return true;
     }
+    if (t.hasAttribute("data-fabric-del")) {
+      P.fabrics.splice(+t.getAttribute("data-fabric-del"), 1); markDirty(); render(); return true;
+    }
     if (t.hasAttribute("data-motor-del")) {
       P.motors.splice(+t.getAttribute("data-motor-del"), 1); markDirty(); render(); return true;
     }
@@ -1650,6 +1790,12 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
   function addAddon() {
     var P = pd();
     P.addons.push({ key: "x" + Date.now().toString(36), label: "New extra", short: "New", price: 0 });
+    markDirty(); render();
+  }
+  function addFabric() {
+    var P = pd();
+    P.fabrics = P.fabrics || [];
+    P.fabrics.push({ key: "f" + Date.now().toString(36), label: "New fabric", rate: null });
     markDirty(); render();
   }
   function addMotorItem() {
@@ -1966,7 +2112,8 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
-      "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del],.m-close,[data-msave]");
+      "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
+      "[data-cu-del],[data-fabric-del],.m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
@@ -1995,6 +2142,13 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     }
     else if (t.hasAttribute("data-edit-quote")) { state.view = "quote"; state.quoteId = t.getAttribute("data-edit-quote"); render(); }
     else if (t.hasAttribute("data-del-quote")) deleteQuote(t.getAttribute("data-del-quote"));
+    else if (t.hasAttribute("data-cu-del")) {
+      var qc2 = getQuote(state.quoteId);
+      if (qc2) {
+        qc2.curtains = (qc2.curtains || []).filter(function (x) { return x.id !== t.getAttribute("data-cu-del"); });
+        queueQuotePatch(qc2.id, "curtains", qc2.curtains); render();
+      }
+    }
     else if (t.hasAttribute("data-mo-del")) {
       var qm = getQuote(state.quoteId);
       if (qm) {
@@ -2041,6 +2195,15 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
           queueQuotePatch(qam.id, "motorisation", qam.motorisation); render();
         }
       }
+      else if (a === "add-curtain") {
+        var qac = getQuote(state.quoteId);
+        if (qac) {
+          qac.curtains = qac.curtains || [];
+          qac.curtains.push({ id: uid(), name: "", fabric: "", width: "" });
+          queueQuotePatch(qac.id, "curtains", qac.curtains); render();
+        }
+      }
+      else if (a === "fabric-add") addFabric();
       else if (a === "motor-add") addMotorItem();
       else if (a === "new-quote") newQuote();
       else if (a === "add-qw") {
@@ -2072,6 +2235,16 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     if (el.hasAttribute("data-q-field")) {
       var qf = getQuote(state.quoteId);
       if (qf) setQuoteField(qf, el.getAttribute("data-q-field"), el.value);
+      return;
+    }
+    if (el.hasAttribute("data-cu")) {
+      var qcu = getQuote(state.quoteId); if (!qcu) return;
+      var cr = (qcu.curtains || []).filter(function (x) { return x.id === el.getAttribute("data-cu"); })[0];
+      if (cr) {
+        cr[el.getAttribute("data-cf2")] = el.value;
+        queueQuotePatch(qcu.id, "curtains", qcu.curtains);
+        refreshQuoteLive(qcu);
+      }
       return;
     }
     if (el.hasAttribute("data-mo")) {
@@ -2124,6 +2297,15 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
     if (el.getAttribute("data-q-field") === "date") {
       var qd = getQuote(state.quoteId);
       if (qd) { setQuoteField(qd, "date", el.value); render(); }
+      return;
+    }
+    if (el.hasAttribute("data-cu")) {
+      var qcu2 = getQuote(state.quoteId); if (!qcu2) return;
+      var cr2 = (qcu2.curtains || []).filter(function (x) { return x.id === el.getAttribute("data-cu"); })[0];
+      if (cr2) {
+        cr2[el.getAttribute("data-cf2")] = el.value;
+        queueQuotePatch(qcu2.id, "curtains", qcu2.curtains); render();
+      }
       return;
     }
     if (el.hasAttribute("data-mo")) {
