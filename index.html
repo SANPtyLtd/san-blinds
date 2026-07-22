@@ -191,6 +191,10 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
 .grid tr.done .statussel{opacity:.7}
 .grid tr.done:hover td{background:#eef2f6}
 .cfg{text-align:left;background:#f4f7fa;border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:#3c4a5a;overflow-x:auto;margin:14px 0 6px}
+.linkbox{width:100%;font-family:var(--mono);font-size:12px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:9px;background:#f7f9fb;color:#3c4a5a;margin:4px 0 12px}
+.linkrow{display:flex;gap:9px;flex-wrap:wrap}
+.tiny{font-size:12px;margin:12px 0 0}
 </style>
 </head>
 <body>
@@ -473,6 +477,7 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
       return '<tr><td class="strong">' + esc(c.name) + '</td><td>' + esc(c.contact || "") + '</td>' +
         '<td>' + esc(c.phone || "") + '</td><td class="dim">' + esc(c.email || "") + '</td>' +
         '<td class="mono">' + n + '</td><td class="rowact">' +
+        '<button class="btn small" data-link-client="' + c.id + '">Link</button>' +
         '<button class="btn small" data-edit-client="' + c.id + '">Edit</button>' +
         '<button class="btn small danger-ghost" data-del-client="' + c.id + '">Delete</button></td></tr>';
     }).join("");
@@ -680,6 +685,53 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
     rebuildHolidaySet(); render();
   }
 
+  /* ---------- client view links ---------- */
+  function clientPortalUrl(c) {
+    var base = window.location.href.split("?")[0].split("#")[0].replace(/[^\/]*$/, "");
+    return base + "client.html?c=" + encodeURIComponent(c.view_token || "");
+  }
+  function clientLinkDialog(id) {
+    var c = getClient(id); if (!c) return;
+    if (!c.view_token) {
+      openModal("Client view link",
+        '<p style="margin-top:0">This client has no link code yet. Run <b>client-portal.sql</b> in Supabase once, ' +
+        'then reload this page.</p>', null);
+      return;
+    }
+    var url = clientPortalUrl(c);
+    openModal("Client view link",
+      '<p class="dim" style="margin-top:0">Send this to <b>' + esc(c.name) + '</b>. It shows only their jobs — ' +
+      'stage and expected completion — and cannot be edited. No login needed.</p>' +
+      '<input class="linkbox" id="lnk" readonly value="' + esc(url) + '">' +
+      '<div class="linkrow">' +
+      '<button class="btn primary" data-copy-link>Copy link</button>' +
+      '<button class="btn danger-ghost" data-newtoken="' + c.id + '">Replace link</button>' +
+      '</div>' +
+      '<p class="dim tiny">Replacing the link stops the old one working straight away — use it if a link has gone astray.</p>',
+      null);
+  }
+  async function regenerateToken(id) {
+    var c = getClient(id); if (!c) return;
+    if (!confirm("Replace the link for " + (c.name || "this client") + "?\n\nTheir old link will stop working immediately.")) return;
+    var tok = (uid() + uid()).replace(/-/g, "");
+    var r = await db.from("clients").update({ view_token: tok }).eq("id", id);
+    if (r.error) { toast("Could not replace the link."); return; }
+    c.view_token = tok;
+    closeModal(); clientLinkDialog(id); toast("New link created.");
+  }
+  function copyLink() {
+    var inp = document.getElementById("lnk"); if (!inp) return;
+    try { inp.focus(); inp.select(); inp.setSelectionRange(0, 99999); } catch (e) {}
+    var done = false;
+    try { done = document.execCommand("copy"); } catch (e) {}
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(inp.value).then(function () { toast("Link copied."); },
+        function () { if (!done) toast("Press Ctrl+C to copy the highlighted link."); });
+    } else {
+      toast(done ? "Link copied." : "Press Ctrl+C to copy the highlighted link.");
+    }
+  }
+
   /* ---------- modal ---------- */
   var modalSave = null;
   function openModal(title, bodyHTML, onSave) {
@@ -687,6 +739,10 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
     var m = document.getElementById("modal");
     m.querySelector(".m-title").textContent = title;
     m.querySelector(".m-body").innerHTML = bodyHTML;
+    var saveBtn = m.querySelector("[data-msave]");
+    var cancelBtn = m.querySelector(".m-foot .m-close");
+    if (saveBtn) saveBtn.style.display = onSave ? "" : "none";
+    if (cancelBtn) cancelBtn.textContent = onSave ? "Cancel" : "Close";
     m.classList.add("open");
   }
   function closeModal() { document.getElementById("modal").classList.remove("open"); modalSave = null; }
@@ -722,11 +778,15 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
   /* ---------- events ---------- */
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
-      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday],.m-close,[data-msave]");
+      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday]," +
+      "[data-link-client],[data-copy-link],[data-newtoken],.m-close,[data-msave]");
     if (!t) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
     else if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); render(); }
     else if (t.hasAttribute("data-edit")) { state.view = "job"; state.jobId = t.getAttribute("data-edit"); state.tab = "info"; render(); }
+    else if (t.hasAttribute("data-link-client")) clientLinkDialog(t.getAttribute("data-link-client"));
+    else if (t.hasAttribute("data-copy-link")) copyLink();
+    else if (t.hasAttribute("data-newtoken")) regenerateToken(t.getAttribute("data-newtoken"));
     else if (t.hasAttribute("data-edit-client")) editClientDialog(t.getAttribute("data-edit-client"));
     else if (t.hasAttribute("data-del-job")) deleteJob(t.getAttribute("data-del-job"));
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
