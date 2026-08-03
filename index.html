@@ -1044,7 +1044,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       }
       var opts = STATUSES.map(function (s) { return '<option ' + (s === j.status ? "selected" : "") + '>' + esc(s) + '</option>'; }).join("");
       return '<tr' + (j.status === "Job Complete" ? ' class="done"' : '') + '>' +
-        '<td class="actcell">' + noteBadge(j) +
+        '<td class="actcell">' +
         '<button class="btn small" data-edit="' + j.id + '">Edit</button></td>' +
         '<td class="mono">' + esc(j.sanRef || "") + '</td>' +
         '<td class="strong">' + esc(j.jobName || "—") + '</td>' +
@@ -1058,7 +1058,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           '<input type="date" class="expinput hidden" value="' + esc(exp.iso) + '" data-exp-job="' + j.id + '">' +
           (exp.manual ? '<button class="expreset" data-exp-clear="' + j.id + '" title="Back to the calculated date">↺</button>' : '') +
         '</td>' +
-        '<td class="rowact">' +
+        '<td class="rowact">' + noteBadge(j) +
         '<button class="iconbtn del" data-del-job="' + j.id + '" title="Delete job" aria-label="Delete job">\u{1F5D1}</button></td></tr>';
     }).join("");
     var head = state.clientView
