@@ -72,21 +72,29 @@ table.grid{width:100%;border-collapse:collapse;font-size:14px}
 .iconbtn{border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;
   font-size:15px;line-height:1;padding:8px 9px;color:#8a94a0;transition:.12s}
 .iconbtn:hover{border-color:#e6b0b0;background:#fdf3f3;color:#b12a2a}
-/* dashboard column sizing.
-   Col 1 = SAN Ref (needs to fit 6 mono chars incl. a space, e.g. "S 1001")
-   Col 3 = Client (given more room)
-   Col 4 = Address (tightened, often empty, so the width goes where it helps) */
-.dashgrid th:nth-child(1),.dashgrid td:nth-child(1){min-width:104px;white-space:nowrap}
-.dashgrid td:nth-child(1){font-family:var(--mono);font-variant-numeric:tabular-nums}
-.dashgrid th:nth-child(3),.dashgrid td:nth-child(3){min-width:220px}
-.dashgrid th:nth-child(4),.dashgrid td:nth-child(4){max-width:170px;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.dashgrid .rowact{gap:5px}
+/* dashboard column sizing (Edit is col 1 on the left).
+   Col 2 = SAN Ref (fits 6 mono chars incl. a space, e.g. "S 1001")
+   Col 4 = Client (more room)
+   Col 5 = Address (shown in full — wraps rather than truncates)
+   Col 7 = Expected (compact short-date display) */
+.dashgrid th:nth-child(1),.dashgrid td:nth-child(1){width:1%;white-space:nowrap;padding-right:6px}
+.dashgrid th:nth-child(2),.dashgrid td:nth-child(2){min-width:104px;white-space:nowrap;
+  font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dashgrid th:nth-child(4),.dashgrid td:nth-child(4){min-width:200px}
+.dashgrid td:nth-child(5){white-space:normal;line-height:1.4}
+.dashgrid th:nth-child(7),.dashgrid td:nth-child(7){white-space:nowrap}
+.dashgrid .actcell{white-space:nowrap}
+.dashgrid .rowact{gap:5px;justify-content:center}
+.expshow{display:inline-block;font-family:var(--mono);font-size:13px;padding:6px 9px;
+  border:1px solid var(--line);border-radius:7px;cursor:pointer;background:#fff;white-space:nowrap}
+.expshow:hover{border-color:var(--teal);color:var(--teal)}
+.expshow.manual{border-color:#d99a2b;background:#fff8e8;color:#8a5a05;font-weight:700}
+.expinput.hidden,.expshow.hidden{display:none}
 @media (max-width:1024px){
   .iconbtn{padding:9px 10px;font-size:16px}
-  .dashgrid th:nth-child(1),.dashgrid td:nth-child(1){min-width:96px}
-  .dashgrid th:nth-child(3),.dashgrid td:nth-child(3){min-width:190px}
-  .dashgrid th:nth-child(4),.dashgrid td:nth-child(4){max-width:130px}
+  .dashgrid th:nth-child(2),.dashgrid td:nth-child(2){min-width:96px}
+  .dashgrid th:nth-child(4),.dashgrid td:nth-child(4){min-width:170px}
+  .btn.small{padding:9px 12px}
 }
 td.idx,.idx{color:var(--dim);width:34px;text-align:center;font-family:var(--mono)}
 .num{text-align:right}
@@ -573,13 +581,17 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   var COMPANY = { name: "SAN Pty Ltd", address: "55 Lampton Avenue, Derwent Park, TAS 7009", phone: "03 6272 3400", email: "admin@sanptyltd.com" };
   function companyLine() { return COMPANY.name + " · " + COMPANY.address + " · Ph " + COMPANY.phone + " · " + COMPANY.email; }
 
-  var STATUSES = ["Not Started", "In Production", "Fabric / Product on Order",
+  var STATUSES = ["Not Started", "In Production", "Item on Order",
     "Delayed", "On Hold", "Cancelled", "Job Complete"];
   var STATUS_CLASS = {
     "Not Started": "s-grey", "In Production": "s-blue",
-    "Fabric / Product on Order": "s-amber", "Delayed": "s-orange",
+    "Item on Order": "s-amber", "Delayed": "s-orange",
     "On Hold": "s-slate", "Cancelled": "s-red", "Job Complete": "s-green"
   };
+  /* Older jobs may have the previous label saved in the database.
+     Map any retired names to their current one so nothing shows blank. */
+  var STATUS_ALIASES = { "Fabric / Product on Order": "Item on Order" };
+  function normStatus(s) { return (s && STATUS_ALIASES[s]) ? STATUS_ALIASES[s] : (s || "Not Started"); }
   var FACE_REC = ["Face / Make", "Rec / Tight"];
   var MAX_WINDOWS = 30;
   var DEFAULT_LEAD_DAYS = 25;   /* used when a client has no lead time set */
@@ -632,6 +644,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     return d;
   }
+  function fmtDateShort(d) {
+    if (!d) return "";
+    if (typeof d === "string") { d = new Date(d + "T00:00:00"); if (isNaN(d)) return ""; }
+    var mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return d.getDate() + " " + mon[d.getMonth()] + " " + String(d.getFullYear()).slice(2);
+  }
   function fmtDate(d) {
     if (!d) return "";
     if (typeof d === "string") { d = new Date(d + "T00:00:00"); if (isNaN(d)) return ""; }
@@ -645,7 +663,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       id: r.id, sanRef: r.san_ref || "", clientRef: r.client_ref || "",
       clientId: r.client_id || null, jobName: r.job_name || "",
       jobAddress: r.job_address || "", dateReceived: r.date_received || "",
-      status: r.status || "Not Started", notes: r.notes || "", clientNote: r.client_note || "", clientNoteAt: r.client_note_at || "",
+      status: normStatus(r.status), notes: r.notes || "", clientNote: r.client_note || "", clientNoteAt: r.client_note_at || "",
       expectedOverride: r.expected_override || "",
       windows: Array.isArray(r.windows) ? r.windows : []
     };
@@ -1026,23 +1044,26 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       }
       var opts = STATUSES.map(function (s) { return '<option ' + (s === j.status ? "selected" : "") + '>' + esc(s) + '</option>'; }).join("");
       return '<tr' + (j.status === "Job Complete" ? ' class="done"' : '') + '>' +
+        '<td class="actcell">' + noteBadge(j) +
+        '<button class="btn small" data-edit="' + j.id + '">Edit</button></td>' +
         '<td class="mono">' + esc(j.sanRef || "") + '</td>' +
         '<td class="strong">' + esc(j.jobName || "—") + '</td>' +
         '<td>' + esc(c ? c.name : "—") + '</td>' +
-        '<td class="dim">' + esc(j.jobAddress || "") + '</td>' +
+        '<td class="dim addrcell">' + esc(j.jobAddress || "") + '</td>' +
         '<td><select class="statussel ' + (STATUS_CLASS[j.status] || "s-grey") + '" data-status-job="' + j.id + '">' + opts + '</select></td>' +
         '<td class="expcell">' +
-          '<input type="date" class="expinput' + (exp.manual ? " manual" : "") + '" value="' + esc(exp.iso) + '"' +
-          ' data-exp-job="' + j.id + '" title="' + (exp.manual ? "Set by hand — click the arrow to go back to the calculated date" : "Worked out from " + clientLeadDays(j.clientId) + " working days") + '">' +
+          '<span class="expshow' + (exp.manual ? " manual" : "") + '" data-exp-show="' + j.id + '" title="' +
+            (exp.manual ? "Set by hand — click to change; use the arrow to go back to the calculated date" : "Worked out from " + clientLeadDays(j.clientId) + " working days — click to override") + '">' +
+            (exp.iso ? esc(fmtDateShort(exp.iso)) : "—") + '</span>' +
+          '<input type="date" class="expinput hidden" value="' + esc(exp.iso) + '" data-exp-job="' + j.id + '">' +
           (exp.manual ? '<button class="expreset" data-exp-clear="' + j.id + '" title="Back to the calculated date">↺</button>' : '') +
         '</td>' +
-        '<td class="rowact">' + noteBadge(j) +
-        '<button class="btn small" data-edit="' + j.id + '">Edit</button>' +
+        '<td class="rowact">' +
         '<button class="iconbtn del" data-del-job="' + j.id + '" title="Delete job" aria-label="Delete job">\u{1F5D1}</button></td></tr>';
     }).join("");
     var head = state.clientView
       ? '<tr><th>Job</th><th>Client</th><th>Stage</th><th>Expected completion</th></tr>'
-      : '<tr><th>SAN Ref</th><th>Job</th><th>Client</th><th>Address</th><th>Stage</th><th>Expected</th><th></th></tr>';
+      : '<tr><th></th><th>SAN Ref</th><th>Job</th><th>Client</th><th>Address</th><th>Stage</th><th>Expected</th><th></th></tr>';
     app.innerHTML = topbar("dashboard") +
       '<main class="wrap">' + coBanner() + '<div class="pagehead">' +
       '<div><h1>Jobs</h1><p class="sub">' + jobs.length + ' job' + (jobs.length === 1 ? "" : "s") + ' in the system</p></div>' +
@@ -2215,6 +2236,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     else if (t.hasAttribute("data-edit-client")) editClientDialog(t.getAttribute("data-edit-client"));
     else if (t.hasAttribute("data-del-job")) deleteJob(t.getAttribute("data-del-job"));
     else if (t.hasAttribute("data-exp-clear")) setExpectedOverride(t.getAttribute("data-exp-clear"), "");
+    else if (t.hasAttribute("data-exp-show")) {
+      var cell = t.parentNode;
+      var span = cell.querySelector(".expshow");
+      var inp = cell.querySelector(".expinput");
+      if (span && inp) { span.classList.add("hidden"); inp.classList.remove("hidden"); inp.focus();
+        if (inp.showPicker) { try { inp.showPicker(); } catch (e) {} } }
+    }
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
     else if (t.hasAttribute("data-del-holiday")) deleteHoliday(t.getAttribute("data-del-holiday"));
     else if (t.hasAttribute("data-del-hgroup")) deleteHolidayGroup(t.getAttribute("data-del-hgroup"));
@@ -2375,6 +2403,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   document.addEventListener("change", function (e) {
     var el = e.target;
     if (el.hasAttribute("data-exp-job")) { setExpectedOverride(el.getAttribute("data-exp-job"), el.value); return; }
+    if (el.hasAttribute("data-exp-show")) { return; }
     if (el.hasAttribute("data-status-job")) {
       var j = getJob(el.getAttribute("data-status-job")); if (j) { j.status = el.value; queueJobPatch(j.id, "status", el.value); render(); } return;
     }
