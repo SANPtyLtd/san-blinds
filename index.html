@@ -417,6 +417,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .bytag{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;
   background:#eef1f4;color:#516072}
 @media (max-width:1024px){.segbtn{padding:11px 20px;font-size:15px}}
+.starcell{width:1%;white-space:nowrap;text-align:center;padding-right:4px}
+.starbtn{border:0;background:transparent;cursor:pointer;font-size:19px;line-height:1;padding:4px 6px;
+  color:#c4ccd4;transition:.12s;-webkit-tap-highlight-color:transparent}
+.starbtn:hover{color:#e0a63a}
+.starbtn.on{color:#efb01e}
+.clientgrid .divrow td{background:#f5f8fa;padding:7px 14px}
+.divlabel{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700}
+@media (max-width:1024px){.starbtn{font-size:22px;padding:6px 8px}}
 </style>
 </head>
 <body>
@@ -1117,23 +1125,48 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '</main>' + footer();
   }
 
+  function sortedClients() {
+    var byName = function (a, b) {
+      var an = (a.name || "").toLowerCase(), bn = (b.name || "").toLowerCase();
+      return an < bn ? -1 : an > bn ? 1 : 0;
+    };
+    var favs = clients.filter(function (c) { return c.is_favourite; }).slice().sort(byName);
+    var rest = clients.filter(function (c) { return !c.is_favourite; }).slice().sort(byName);
+    return { favs: favs, rest: rest };
+  }
+  function clientRow(c) {
+    var n = jobs.filter(function (j) { return j.clientId === c.id; }).length;
+    var ld = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "") ? c.lead_days : DEFAULT_LEAD_DAYS;
+    var custom = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "");
+    return '<tr><td class="starcell">' +
+      '<button class="starbtn ' + (c.is_favourite ? "on" : "") + '" data-fav-client="' + c.id + '" ' +
+      'title="' + (c.is_favourite ? "Remove from favourites" : "Add to favourites") + '" aria-label="Favourite">' +
+      (c.is_favourite ? "\u2605" : "\u2606") + '</button></td>' +
+      '<td class="strong">' + esc(c.name) + '</td><td>' + esc(c.contact || "") + '</td>' +
+      '<td>' + esc(c.phone || "") + '</td><td class="dim">' + esc(c.email || "") + '</td>' +
+      '<td class="mono ralign' + (custom ? ' leadcustom' : ' dim') + '">' + ld + '</td>' +
+      '<td class="mono">' + n + '</td><td class="rowact">' +
+      '<button class="btn small" data-link-client="' + c.id + '">Link</button>' +
+      '<button class="btn small" data-edit-client="' + c.id + '">Edit</button>' +
+      '<button class="iconbtn del" data-del-client="' + c.id + '" title="Delete client" aria-label="Delete client">\u{1F5D1}</button></td></tr>';
+  }
   function renderClients() {
-    var rows = clients.map(function (c) {
-      var n = jobs.filter(function (j) { return j.clientId === c.id; }).length;
-      var ld = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "") ? c.lead_days : DEFAULT_LEAD_DAYS;
-      var custom = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "");
-      return '<tr><td class="strong">' + esc(c.name) + '</td><td>' + esc(c.contact || "") + '</td>' +
-        '<td>' + esc(c.phone || "") + '</td><td class="dim">' + esc(c.email || "") + '</td>' +
-        '<td class="mono ralign' + (custom ? ' leadcustom' : ' dim') + '">' + ld + '</td>' +
-        '<td class="mono">' + n + '</td><td class="rowact">' +
-        '<button class="btn small" data-link-client="' + c.id + '">Link</button>' +
-        '<button class="btn small" data-edit-client="' + c.id + '">Edit</button>' +
-        '<button class="btn small danger-ghost" data-del-client="' + c.id + '">Delete</button></td></tr>';
-    }).join("");
+    var groups = sortedClients();
+    var favRows = groups.favs.map(clientRow).join("");
+    var restRows = groups.rest.map(clientRow).join("");
+    var colspan = 8;
+    var body = "";
+    if (groups.favs.length) {
+      body += favRows;
+      if (groups.rest.length) {
+        body += '<tr class="divrow"><td colspan="' + colspan + '"><span class="divlabel">All other clients</span></td></tr>';
+      }
+    }
+    body += restRows;
     app.innerHTML = topbar("clients") + '<main class="wrap"><div class="pagehead">' +
       '<div><h1>Clients</h1><p class="sub">' + clients.length + ' client' + (clients.length === 1 ? "" : "s") + '</p></div>' +
       '<button class="btn primary" data-action="newclient">New client</button></div>' +
-      (clients.length ? '<div class="card"><table class="grid"><thead><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th class="ralign">Lead days</th><th>Jobs</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      (clients.length ? '<div class="card"><table class="grid clientgrid"><thead><tr><th></th><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th class="ralign">Lead days</th><th>Jobs</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>'
         : '<div class="empty"><h3>No clients yet</h3><button class="btn primary" data-action="newclient">New client</button></div>') +
       '</main>' + footer();
   }
@@ -2092,7 +2125,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     function cf(l, v, k) { return '<label class="fld"><span>' + l + '</span><input value="' + esc(v || "") + '" data-cf="' + k + '"></label>'; }
     openModal("Client details",
       '<div class="formgrid">' + cf("Name", c.name, "name") + cf("Contact", c.contact, "contact") +
-      cf("Phone", c.phone, "phone") + cf("Email", c.email, "email") + cf("Address", c.address, "address") +
+      cf("Contact person", c.contact_person, "contact_person") +
+      cf("Phone", c.phone, "phone") + cf("Secondary phone", c.phone2, "phone2") +
+      cf("Email", c.email, "email") + cf("Address", c.address, "address") +
       '<label class="fld"><span>Lead time (working days)</span>' +
       '<input type="number" inputmode="numeric" min="1" value="' + esc(c.lead_days == null ? "" : c.lead_days) +
       '" placeholder="' + DEFAULT_LEAD_DAYS + ' (default)" data-cf="lead_days"></label>' +
@@ -2112,6 +2147,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         var r = await db.from("clients").update(patch).eq("id", c.id);
         if (r.error) toast("Save failed."); render();
       });
+  }
+  async function toggleFavourite(id) {
+    var c = clients.filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    c.is_favourite = !c.is_favourite;
+    render();
+    var r = await db.from("clients").update({ is_favourite: c.is_favourite }).eq("id", id);
+    if (r.error) { c.is_favourite = !c.is_favourite; toast("Could not update favourite."); render(); }
   }
   async function deleteClient(id) {
     if (jobs.some(function (x) { return x.clientId === id; })) { toast("This client has jobs — reassign or delete those first."); return; }
@@ -2283,7 +2326,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
-      "[data-cu-del],[data-fabric-del],[data-qauthor],.m-close,[data-msave]");
+      "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client],.m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
@@ -2302,6 +2345,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (span && inp) { span.classList.add("hidden"); inp.classList.remove("hidden"); inp.focus();
         if (inp.showPicker) { try { inp.showPicker(); } catch (e) {} } }
     }
+    else if (t.hasAttribute("data-fav-client")) toggleFavourite(t.getAttribute("data-fav-client"));
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
     else if (t.hasAttribute("data-del-holiday")) deleteHoliday(t.getAttribute("data-del-holiday"));
     else if (t.hasAttribute("data-del-hgroup")) deleteHolidayGroup(t.getAttribute("data-del-hgroup"));
