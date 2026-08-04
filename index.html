@@ -1320,6 +1320,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var c = getClient(x.clientId);
       var T = quoteTotals(x);
       return '<tr' + (x.ordered ? ' class="ordered"' : '') + '>' +
+        '<td class="actcell"><button class="btn small" data-edit-quote="' + x.id + '">Edit</button></td>' +
         '<td class="mono">' + esc(x.ref || "—") + '</td>' +
         '<td class="strong">' + esc(x.jobName || "Untitled quote") + '</td>' +
         '<td>' + esc(c ? c.name : "—") + '</td>' +
@@ -1333,8 +1334,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           (x.ordered ? '<input class="orddate" type="date" value="' + esc(x.orderedDate || "") + '" data-q-orddate="' + x.id + '">' : '') +
         '</td>' +
         '<td class="rowact">' +
-        '<button class="btn small" data-edit-quote="' + x.id + '">Edit</button>' +
-        '<button class="btn small danger-ghost" data-del-quote="' + x.id + '">Delete</button></td></tr>';
+        '<button class="iconbtn del" data-del-quote="' + x.id + '" title="Delete quote" aria-label="Delete quote">\u{1F5D1}</button></td></tr>';
     }).join("");
 
     app.innerHTML = topbar("quotes") +
@@ -1347,7 +1347,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div class="authorbar">' + authorTabs + '</div>' +
       (quotes.length
         ? '<div class="card"><table class="grid"><thead><tr>' +
-          '<th>Quote</th><th>Job</th><th>Client</th><th>Date</th><th>By</th><th class="ralign">Blinds</th>' +
+          '<th></th><th>Quote</th><th>Job</th><th>Client</th><th>Date</th><th>By</th><th class="ralign">Blinds</th>' +
           '<th class="ralign">Total</th><th>Ordered</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
           (list.length ? "" : '<div class="nomatch">No quotes match “' + esc(state.quoteSearch) + '”.</div>') + '</div>'
         : '<div class="empty"><h3>No quotes yet</h3><p>Create your first quote to get started.</p>' +
@@ -2283,7 +2283,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
-      "[data-cu-del],[data-fabric-del],.m-close,[data-msave]");
+      "[data-cu-del],[data-fabric-del],[data-qauthor],.m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
