@@ -407,6 +407,16 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   color:#1d7a45;font-weight:700;margin-bottom:5px}
 .notebadge.on:hover .notepop,.notebadge.on:focus .notepop{display:block}
 @media (max-width:1024px){.notebadge{width:34px;height:34px}}
+.authorbar{margin:2px 0 14px}
+.segwrap{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.segbtn{border:0;background:#fff;padding:9px 18px;font-family:inherit;font-size:14px;font-weight:600;
+  color:var(--dim);cursor:pointer;border-right:1px solid var(--line)}
+.segbtn:last-child{border-right:0}
+.segbtn:hover{background:#f5f8fa;color:var(--text)}
+.segbtn.on{background:var(--teal);color:#fff}
+.bytag{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;
+  background:#eef1f4;color:#516072}
+@media (max-width:1024px){.segbtn{padding:11px 20px;font-size:15px}}
 </style>
 </head>
 <body>
@@ -725,7 +735,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       db.from("jobs").select("*").order("created_at", { ascending: false }),
       db.from("holidays").select("*").order("day"),
       db.from("quotes").select("*").order("created_at", { ascending: false }),
-      db.from("price_lists").select("*").order("created_at", { ascending: false })
+      db.from("price_lists").select("*").order("created_at", { ascending: false }),
+      db.from("quote_access").select("email")
     ]);
     if (res[0].error || res[1].error || res[2].error) {
       throw (res[0].error || res[1].error || res[2].error);
@@ -739,7 +750,20 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     /* price_lists table is optional until prices.sql has been run */
     priceLists = (res[4] && !res[4].error) ? (res[4].data || []) : [];
     pricesReady = !!(res[4] && !res[4].error);
+    /* quote_access is optional until quote-access.sql has been run */
+    if (res[5] && !res[5].error) {
+      quoteAccess = (res[5].data || []).map(function (r) { return (r.email || "").toLowerCase(); });
+      quoteAccessLoaded = true;
+    } else { quoteAccess = []; quoteAccessLoaded = false; }
     rebuildHolidaySet();
+  }
+  var QUOTE_AUTHORS = ["AK", "BA", "Other"];
+  var quoteAccess = [];        /* emails allowed into Quotes */
+  var quoteAccessLoaded = false;
+  function canUseQuotes() {
+    if (!quoteAccessLoaded) return true;          /* table not set up yet -> open to all, as before */
+    if (!quoteAccess.length) return true;         /* empty allow-list -> don't lock everyone out */
+    return !!(user && quoteAccess.indexOf((user.email || "").toLowerCase()) !== -1);
   }
   var quotesReady = true, pricesReady = true;
   var rtSetUp = false;
@@ -791,6 +815,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (state.view === "job") return renderJob();
     if (state.view === "clients") return renderClients();
     if (state.view === "holidays") return renderHolidays();
+    if (state.view === "quotes" || state.view === "quote") {
+      if (!canUseQuotes()) return renderQuotesLocked();
+    }
     if (state.view === "quotes") return quotesReady ? renderQuotes() : renderQuotesNotReady();
     if (state.view === "quote") return renderQuoteEditor();
     if (state.view === "prices") return pricesReady ? renderPrices() : renderPricesNotReady();
@@ -824,6 +851,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       orderedDate: r.ordered_date || "",
       fabricNotes: r.fabric_notes || "",
       priceListId: r.price_list_id || null,
+      createdBy: r.created_by || "",
       motorisation: Array.isArray(r.motorisation) ? r.motorisation : [],
       curtains: Array.isArray(r.curtains) ? r.curtains : [],
       windows: Array.isArray(r.windows) && r.windows.length ? r.windows : [blankQuoteWindow()]
@@ -833,9 +861,20 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     ref: "quote_ref", clientId: "client_id", jobName: "job_name", date: "quote_date",
     install: "include_install", gst: "include_gst", ordered: "ordered",
     orderedDate: "ordered_date", fabricNotes: "fabric_notes", windows: "windows",
-    motorisation: "motorisation", curtains: "curtains"
+    motorisation: "motorisation", curtains: "curtains", createdBy: "created_by"
   };
   function getQuote(id) { return quotes.filter(function (q) { return q.id === id; })[0]; }
+  /* Maps a login email to the initials shown on "Quote by".
+     Edit the emails here if staff change. */
+  var AUTHOR_BY_EMAIL = {
+    "adam@sanptyltd.com": "AK",
+    "brenden@sanptyltd.com": "BA",
+    "tenille@shorelineblinds.com.au": "Other"
+  };
+  function defaultAuthor() {
+    var e = (user && user.email ? user.email : "").toLowerCase();
+    return AUTHOR_BY_EMAIL[e] || "";
+  }
 
   var qPending = {}, qPatchT = {};
   function queueQuotePatch(id, col, value) {
@@ -982,7 +1021,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<nav class="nav">' +
       '<button class="navlink ' + (active === "dashboard" ? "on" : "") + '" data-go="dashboard">Jobs</button>' +
       '<button class="navlink ' + (active === "clients" ? "on" : "") + '" data-go="clients">Clients</button>' +
-      '<button class="navlink ' + (active === "quotes" ? "on" : "") + '" data-go="quotes">Quotes</button>' +
+      (canUseQuotes() ? '<button class="navlink ' + (active === "quotes" ? "on" : "") + '" data-go="quotes">Quotes</button>' : "") +
       '<button class="navlink ' + (active === "holidays" ? "on" : "") + '" data-go="holidays">Holidays</button>' +
       '<button class="navlink ' + (active === "prices" ? "on" : "") + '" data-go="prices">Prices</button>' +
       '</nav>' +
@@ -1245,6 +1284,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
 
 
+  function renderQuotesLocked() {
+    app.innerHTML = topbar("dashboard") + '<main class="wrap">' +
+      '<div class="pagehead"><div><h1>Quotes</h1></div></div>' +
+      '<div class="empty"><h3>Not available on this login</h3>' +
+      '<p>The Quotes section is limited to selected staff. If you need access, ask whoever manages the system to add your login.</p>' +
+      '<button class="btn primary" data-go="dashboard">Back to Jobs</button></div>' +
+      '</main>' + footer();
+  }
   function renderQuotesNotReady() {
     app.innerHTML = topbar("quotes") + '<main class="wrap">' +
       '<div class="pagehead"><div><h1>Quotes</h1></div></div>' +
@@ -1257,12 +1304,17 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   /* ---------- quote list ---------- */
   function renderQuotes() {
     var q = (state.quoteSearch || "").toLowerCase();
+    var who = state.quoteAuthor || "All";
     var list = quotes.filter(function (x) {
+      if (who !== "All" && (x.createdBy || "") !== who) return false;
       if (!q) return true;
       var c = getClient(x.clientId);
-      return [x.ref, x.jobName, c ? c.name : "", x.ordered ? "ordered" : ""]
+      return [x.ref, x.jobName, c ? c.name : "", x.createdBy || "", x.ordered ? "ordered" : ""]
         .join(" ").toLowerCase().indexOf(q) !== -1;
     });
+    var authorTabs = '<div class="segwrap">' + ["All"].concat(QUOTE_AUTHORS).map(function (a) {
+      return '<button class="segbtn ' + (who === a ? "on" : "") + '" data-qauthor="' + esc(a) + '">' + esc(a) + '</button>';
+    }).join("") + '</div>';
 
     var rows = list.map(function (x) {
       var c = getClient(x.clientId);
@@ -1272,6 +1324,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '<td class="strong">' + esc(x.jobName || "Untitled quote") + '</td>' +
         '<td>' + esc(c ? c.name : "—") + '</td>' +
         '<td class="mono">' + esc(fmtDate(x.date)) + '</td>' +
+        '<td>' + (x.createdBy ? '<span class="bytag">' + esc(x.createdBy) + '</span>' : '<span class="dim">—</span>') + '</td>' +
         '<td class="mono ralign">' + T.qty + '</td>' +
         '<td class="mono ralign strong">' + money(T.total) + '</td>' +
         '<td class="ordcell">' +
@@ -1291,9 +1344,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<input class="search" placeholder="Search quotes or clients" value="' + esc(state.quoteSearch || "") + '" data-qsearch>' +
       '<button class="btn primary" data-action="new-quote">New quote</button>' +
       '</div></div>' +
+      '<div class="authorbar">' + authorTabs + '</div>' +
       (quotes.length
         ? '<div class="card"><table class="grid"><thead><tr>' +
-          '<th>Quote</th><th>Job</th><th>Client</th><th>Date</th><th class="ralign">Blinds</th>' +
+          '<th>Quote</th><th>Job</th><th>Client</th><th>Date</th><th>By</th><th class="ralign">Blinds</th>' +
           '<th class="ralign">Total</th><th>Ordered</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
           (list.length ? "" : '<div class="nomatch">No quotes match “' + esc(state.quoteSearch) + '”.</div>') + '</div>'
         : '<div class="empty"><h3>No quotes yet</h3><p>Create your first quote to get started.</p>' +
@@ -1359,6 +1413,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<label class="fld"><span>Quote reference</span><input value="' + esc(q.ref || "") + '" placeholder="Q 0001" data-q-field="ref"></label>' +
       '<label class="fld"><span>Job / site name</span><input value="' + esc(q.jobName || "") + '" placeholder="e.g. Wilson Homes" data-q-field="jobName"></label>' +
       '<label class="fld"><span>Date</span><input type="date" value="' + esc(q.date || "") + '" data-q-field="date"></label>' +
+      '<label class="fld"><span>Quote by</span><select data-q-field="createdBy">' +
+        '<option value="">— select —</option>' +
+        QUOTE_AUTHORS.map(function (a) { return '<option ' + (a === q.createdBy ? "selected" : "") + '>' + esc(a) + '</option>'; }).join("") +
+      '</select></label>' +
       '</div>' +
       '<div class="ordbar">' +
       '<label class="toggle"><input type="checkbox" data-q-ordered="' + q.id + '" ' + (q.ordered ? "checked" : "") + '><span>Ordered</span></label>' +
@@ -1550,7 +1608,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       quote_ref: "", client_id: clients[0] ? clients[0].id : null, job_name: "",
       quote_date: todayISO(), include_install: true, include_gst: false,
       ordered: false, fabric_notes: "", windows: [blankQuoteWindow()], motorisation: [], curtains: [],
-      price_list_id: currentList() ? currentList().id : null
+      price_list_id: currentList() ? currentList().id : null,
+      created_by: defaultAuthor()
     };
     var r = await db.from("quotes").insert(row).select().single();
     if (r.error) { toast("Could not create quote."); return; }
@@ -2258,6 +2317,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         }
       }
     }
+    else if (t.hasAttribute("data-qauthor")) { state.quoteAuthor = t.getAttribute("data-qauthor"); render(); }
     else if (t.hasAttribute("data-edit-quote")) { state.view = "quote"; state.quoteId = t.getAttribute("data-edit-quote"); render(); }
     else if (t.hasAttribute("data-del-quote")) deleteQuote(t.getAttribute("data-del-quote"));
     else if (t.hasAttribute("data-cu-del")) {
@@ -2421,6 +2481,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.getAttribute("data-q-field") === "date") {
       var qd = getQuote(state.quoteId);
       if (qd) { setQuoteField(qd, "date", el.value); render(); }
+      return;
+    }
+    if (el.getAttribute("data-q-field") === "createdBy") {
+      var qb = getQuote(state.quoteId);
+      if (qb) { setQuoteField(qb, "createdBy", el.value); render(); }
       return;
     }
     if (el.hasAttribute("data-cu")) {
