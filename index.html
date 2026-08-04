@@ -394,9 +394,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   .p-co{font-size:11px;color:#444;text-align:right;line-height:1.6}
 }
 /* client-note indicator on the dashboard */
-.notebadge{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+.notebadge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:30px;height:30px;
+  box-sizing:border-box;padding:0;
   border-radius:8px;font-size:15px;margin-right:6px;vertical-align:middle;position:relative;cursor:default}
-.notebadge.empty{color:#c4ccd4;background:transparent}
+.notebadge.nonote{color:#c4ccd4;background:transparent}
 .notebadge.on{color:#1d7a45;background:#dcf3e4;cursor:pointer}
 .notebadge.on:hover,.notebadge.on:focus{background:#c7ecd5;outline:none}
 .notepop{display:none;position:absolute;bottom:calc(100% + 8px);right:0;z-index:40;
@@ -698,7 +699,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function noteBadge(j) {
     var note = (j.clientNote || "").trim();
     if (!note) {
-      return '<span class="notebadge empty" title="No client note on this job">\u2709</span>';
+      return '<span class="notebadge nonote" title="No client note on this job">\u2709</span>';
     }
     var when = noteDateText(j.clientNoteAt);
     var tip = "Client note" + (when ? " (added " + when + ")" : "") + ":\n" + note;
