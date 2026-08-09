@@ -393,7 +393,32 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   .p-logo{height:56px;width:auto}
   .p-co{font-size:11px;color:#444;text-align:right;line-height:1.6}
 }
-/* client-note indicator on the dashboard */
+/* wider window entry table + horizontal scroll on narrow screens */
+.tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.winentry{min-width:1080px}
+.winentry th,.winentry td{padding:6px 7px}
+.winentry .fabsel,.winentry .rollsel,.winentry .fabtext,.winentry .frsel{width:100%;min-width:96px;box-sizing:border-box;
+  border:1px solid var(--line);background:#fff;padding:8px 8px;border-radius:7px;font-family:inherit;font-size:14px}
+.winentry .rollsel{min-width:64px}
+.winentry input.narrow{max-width:82px}
+.winentry .oneoffcell{text-align:center}
+.oneoff{display:inline-flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;color:var(--dim);cursor:pointer;line-height:1}
+.oneoff input{margin:0}
+/* Fabrics management tab */
+.fabblock{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;background:#fcfdfe}
+.fabhd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.fabname{flex:1;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:15px;font-weight:600}
+.colrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.colchip{display:inline-flex;align-items:center;background:#fff;border:1px solid var(--line);border-radius:999px;padding:2px 2px 2px 4px}
+.colchip input{border:0;background:transparent;padding:5px 6px;font-family:inherit;font-size:13px;width:96px;outline:none}
+.colchip input:focus{background:#f2f8ff;border-radius:999px}
+.chipx{border:0;background:transparent;color:#b0b8c0;cursor:pointer;font-size:15px;line-height:1;padding:2px 7px;border-radius:999px}
+.chipx:hover{color:#b12a2a;background:#fdeeee}
+.btn.ghost{background:transparent;border:1px dashed var(--line);color:var(--dim)}
+.btn.ghost:hover{border-color:var(--teal);color:var(--teal)}
+.savedtag{color:#1d7a45;font-weight:600;font-size:13px;padding:8px 4px}
+@media (max-width:1024px){.colchip input{width:88px}}
+
 .notebadge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:30px;height:30px;
   box-sizing:border-box;padding:0;
   border-radius:8px;font-size:15px;margin-right:6px;vertical-align:middle;position:relative;cursor:default}
@@ -737,6 +762,38 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     return job.windows.filter(function (w) { return (w.name || "").trim() || num(w.width) || num(w.drop); });
   }
 
+  /* ---------- blind fabrics + baserails ---------- */
+  var BUILTIN_FABRICS = { fabrics: [{"name": "Vibe", "colours": ["Tundra", "Nimbus", "Alloy", "Surf", "Mist", "Terrace", "Limestone", "Pure", "Lace", "Cloud", "Birch", "Loft", "Porcelain", "Linen", "Moon", "Spirit", "Dune", "Dbistro", "Chateau", "Stone", "Clay", "Umber", "Odessey", "Orient", "Coal", "Lava Metallic", "Mercury Metallic", "Brulee Metallic", "Storm", "Whisper", "Ice"]}, {"name": "Aventus 5%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 3%", "colours": ["White", "White Stone", "White Grey", "Charcoal Grey", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 10%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Linesque Blockout", "colours": ["Almond", "Aspen", "Blanco", "Breeze", "Denim", "Dove", "Fig", "Fleece", "Fossil", "Raffia", "Soba", "Vine"]}, {"name": "Linesque Light Filtering", "colours": ["Lily", "Oatcake", "Wicker", "Hazel", "Trellis", "Chestnut", "Owl", "Winter", "Delta", "Granite", "Stonewash", "Levi"]}, {"name": "Endota", "colours": ["Optic", "Natural White", "Almond", "Cashmere", "Pastel", "Soft Sable", "Eucalypt", "Smokey", "Flagstone", "Gentle Grey", "Cool Black"]}, {"name": "Le Reve Blockout", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Le Reve Light Filtering", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Mantra Blockout", "colours": ["Cotton", "Opal", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Spice", "Flint", "Pebble", "Shale"]}, {"name": "Mantra Light Filtering", "colours": ["Cotton", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Pebble", "Shale"]}, {"name": "Skye Blockout", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Skye Light Filtering", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Palm Beach Blockout", "colours": ["Quill", "Lyric", "Merino", "Jasmine", "Gull", "Porpoise", "Urben", "Thunder", "Summer Storm", "Iron", "Dusk", "Quartz"]}, {"name": "Palm Beach Light Filtering", "colours": ["Melody", "Horizon", "Angora", "Pearl", "Monsoon", "Steel", "Ink"]}, {"name": "Duo Block 3.0", "colours": ["Aztec", "Basalt", "Calm", "Carbon", "Cumulus", "Dove", "Muse", "Nova", "Stella", "Salt"]}, {"name": "Duo Light", "colours": ["Bright White", "Warm White", "Mid Grey"]}, {"name": "Duo Screen", "colours": ["White", "White Stone", "White Linen", "Dune Grey", "White Grey", "Blue Grey", "Charcoal Grey", "Charcoal Slate", "Charcoal"]}, {"name": "Edge", "colours": ["Alabaster", "Ammonite", "Bright", "Calico", "Charcoal", "Ironstone", "Pumice", "Soft Grey"]}, {"name": "Bond", "colours": ["Ice", "Chalk", "Linen", "Taupe", "Cloud", "Concrete", "Granite", "Charcoal"]}, {"name": "Resene Origin", "colours": ["All Black", "Baltic Sea", "Double Stack", "Surrender", "Concrete", "Alabaster", "Black White", "Rice Cake", "Quarter Tea", "Truffle", "Masala", "Bokara Grey"]}, {"name": "St Lucia", "colours": ["Arctic", "Ice", "White", "Stone", "Silver", "Charcoal"]}, {"name": "SB Opulence", "colours": ["White", "Taupe Grey", "Alabaster", "Silver", "Ivory", "Haze", "Champagne", "Shadow", "Merino", "Black"]}, {"name": "Tasman", "colours": ["Ice", "Ivory", "Beech", "Platinium", "Domino", "Storm", "Graphite", "Skyline", "Shadow"]}, {"name": "Woolamai", "colours": ["Cloud", "Silver", "Sand", "Storm", "Driftwood", "Basalt", "Stone", "Onyx"]}, {"name": "Dawn", "colours": ["White", "Linen", "Oyster", "Warm White", "Custom Cream", "Natural", "Angora", "Gosling", "Ecru", "Pannacotta", "Birch", "Thunder", "Soft Grey", "Daybreak", "Cotton", "Ash Blue", "Grey", "Mid Grey", "Crane", "Dark Grey", "Black", "Arum", "Mariah", "Putty", "Misty", "Alabaster", "Ivory", "Sesame", "Dune", "Earthen", "Pewter", "Light Bison", "Slate"]}], baserails: [{"type": "Elipse", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "D30 Silent", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone", "Matt Black", "Matt White"]}, {"type": "Minimal", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "Lathe", "colours": ["Timber"]}] };
+  var fabricSettings = { fabrics: [], baserails: [] };
+  function normaliseFabrics(d) {
+    var out = { fabrics: [], baserails: [] };
+    if (d && Array.isArray(d.fabrics)) {
+      out.fabrics = d.fabrics.filter(function (f) { return f && f.name; }).map(function (f) {
+        return { name: String(f.name), colours: Array.isArray(f.colours) ? f.colours.map(String) : [] };
+      });
+    }
+    if (d && Array.isArray(d.baserails)) {
+      out.baserails = d.baserails.filter(function (b) { return b && b.type; }).map(function (b) {
+        return { type: String(b.type), colours: Array.isArray(b.colours) ? b.colours.map(String) : [] };
+      });
+    }
+    return out;
+  }
+  function fabricColours(name) {
+    var f = fabricSettings.fabrics.filter(function (x) { return x.name === name; })[0];
+    return f ? f.colours : [];
+  }
+  function baserailColours(type) {
+    var b = fabricSettings.baserails.filter(function (x) { return x.type === type; })[0];
+    return b ? b.colours : [];
+  }
+  async function saveFabricSettings() {
+    var payload = { key: "blind_fabrics", data: fabricSettings, updated_at: new Date().toISOString() };
+    var r = await db.from("app_settings").upsert(payload, { onConflict: "key" });
+    if (r.error) toast("Could not save fabrics. " + (r.error.message || ""));
+    return !r.error;
+  }
+
   /* ---------- supabase load + realtime ---------- */
   async function loadAll() {
     var res = await Promise.all([
@@ -745,7 +802,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       db.from("holidays").select("*").order("day"),
       db.from("quotes").select("*").order("created_at", { ascending: false }),
       db.from("price_lists").select("*").order("created_at", { ascending: false }),
-      db.from("quote_access").select("email")
+      db.from("quote_access").select("email"),
+      db.from("app_settings").select("*").eq("key", "blind_fabrics")
     ]);
     if (res[0].error || res[1].error || res[2].error) {
       throw (res[0].error || res[1].error || res[2].error);
@@ -764,6 +822,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       quoteAccess = (res[5].data || []).map(function (r) { return (r.email || "").toLowerCase(); });
       quoteAccessLoaded = true;
     } else { quoteAccess = []; quoteAccessLoaded = false; }
+    /* blind fabrics + baserails (optional until fabrics.sql has been run) */
+    if (res[6] && !res[6].error && res[6].data && res[6].data.length && res[6].data[0].data) {
+      fabricSettings = normaliseFabrics(res[6].data[0].data);
+    } else {
+      fabricSettings = normaliseFabrics(BUILTIN_FABRICS);
+    }
     rebuildHolidaySet();
   }
   var QUOTE_AUTHORS = ["AK", "BA", "Other"];
@@ -830,6 +894,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (state.view === "quotes") return quotesReady ? renderQuotes() : renderQuotesNotReady();
     if (state.view === "quote") return renderQuoteEditor();
     if (state.view === "prices") return pricesReady ? renderPrices() : renderPricesNotReady();
+    if (state.view === "fabrics") return renderFabrics();
     return renderDashboard();
   }
   function configured() {
@@ -1033,6 +1098,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       (canUseQuotes() ? '<button class="navlink ' + (active === "quotes" ? "on" : "") + '" data-go="quotes">Quotes</button>' : "") +
       '<button class="navlink ' + (active === "holidays" ? "on" : "") + '" data-go="holidays">Holidays</button>' +
       '<button class="navlink ' + (active === "prices" ? "on" : "") + '" data-go="prices">Prices</button>' +
+      '<button class="navlink ' + (active === "fabrics" ? "on" : "") + '" data-go="fabrics">Fabrics</button>' +
       '</nav>' +
       '<div class="topactions">' +
       '<span id="savechip">' + saveChipHTML() + '</span>' +
@@ -1270,20 +1336,58 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '</div>';
   }
   function windowsTab(job) {
+    function opt(v, sel) { return '<option ' + (v === sel ? "selected" : "") + '>' + esc(v) + '</option>'; }
     var rows = job.windows.map(function (w, i) {
-      var frOpts = '<option value="">—</option>' + FACE_REC.map(function (o) { return '<option ' + (o === w.faceRec ? "selected" : "") + '>' + esc(o) + '</option>'; }).join("");
+      var frOpts = '<option value="">—</option>' + FACE_REC.map(function (o) { return opt(o, w.faceRec); }).join("");
+      var custom = !!w.fabricCustom;
+      // fabric + colour: dropdowns, or text boxes when "one-off" is ticked
+      var fabricCell, colourCell;
+      if (custom) {
+        fabricCell = '<input class="fabtext" value="' + esc(w.fabric || "") + '" placeholder="Fabric" data-win="' + w.id + '" data-wf="fabric">';
+        colourCell = '<input class="fabtext" value="' + esc(w.fabricColour || "") + '" placeholder="Colour" data-win="' + w.id + '" data-wf="fabricColour">';
+      } else {
+        var fOpts = '<option value="">—</option>' + fabricSettings.fabrics.map(function (f) { return opt(f.name, w.fabric); }).join("");
+        fabricCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="fabric">' + fOpts + '</select>';
+        var cOpts = '<option value="">—</option>' + fabricColours(w.fabric).map(function (c) { return opt(c, w.fabricColour); }).join("");
+        colourCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="fabricColour"' + (w.fabric ? "" : " disabled") + '>' + cOpts + '</select>';
+      }
+      // baserail + colour (always dropdowns)
+      var bOpts = '<option value="">—</option>' + fabricSettings.baserails.map(function (b) { return opt(b.type, w.baserail); }).join("");
+      var baserailCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="baserail">' + bOpts + '</select>';
+      var bcOpts = '<option value="">—</option>' + baserailColours(w.baserail).map(function (c) { return opt(c, w.baserailColour); }).join("");
+      var baserailColourCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="baserailColour"' + (w.baserail ? "" : " disabled") + '>' + bcOpts + '</select>';
+      // roll direction
+      var rollOpts = '<option value="">—</option>' + ["OR", "UR"].map(function (o) { return opt(o, w.roll); }).join("");
+      var rollCell = '<select class="rollsel" data-win="' + w.id + '" data-wf="roll">' + rollOpts + '</select>';
       return '<tr><td class="idx">' + (i + 1) + '</td>' +
         '<td><input value="' + esc(w.name || "") + '" placeholder="Window name" data-win="' + w.id + '" data-wf="name"></td>' +
         '<td><select class="frsel" data-win="' + w.id + '" data-wf="faceRec">' + frOpts + '</select></td>' +
-        '<td><input class="mono num" type="number" value="' + esc(w.width || "") + '" data-win="' + w.id + '" data-wf="width"></td>' +
-        '<td><input class="mono num" type="number" value="' + esc(w.drop || "") + '" data-win="' + w.id + '" data-wf="drop"></td>' +
+        '<td><input class="mono num narrow" type="number" value="' + esc(w.width || "") + '" data-win="' + w.id + '" data-wf="width"></td>' +
+        '<td><input class="mono num narrow" type="number" value="' + esc(w.drop || "") + '" data-win="' + w.id + '" data-wf="drop"></td>' +
+        '<td>' + fabricCell + '</td>' +
+        '<td>' + colourCell + '</td>' +
+        '<td class="oneoffcell"><label class="oneoff" title="Type a one-off fabric and colour by hand">' +
+          '<input type="checkbox" data-win="' + w.id + '" data-wf="fabricCustom" ' + (custom ? "checked" : "") + '><span>one-off</span></label></td>' +
+        '<td>' + baserailCell + '</td>' +
+        '<td>' + baserailColourCell + '</td>' +
+        '<td>' + rollCell + '</td>' +
         '<td class="rowact"><button class="btn small danger-ghost" data-del-win="' + w.id + '">✕</button></td></tr>';
     }).join("");
     var canAdd = job.windows.length < MAX_WINDOWS;
-    return '<div class="card"><table class="grid entry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face or Rec</th><th>Width (mm)</th><th>Drop (mm)</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    return '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="entryfoot"><button class="btn ' + (canAdd ? "primary" : "disabled") + '" data-action="addwin" ' + (canAdd ? "" : "disabled") + '>+ Add window</button>' +
       '<span class="count">' + job.windows.length + ' / ' + MAX_WINDOWS + ' windows</span></div></div>' +
       '<p class="hint">Pick <b>Face / Make</b> or <b>Rec / Tight</b> for every window — the cut list and labels use it to work out the cloth size.</p>';
+  }
+  function fabricSummary(w) {
+    var f = (w.fabric || "").trim(), c = (w.fabricColour || "").trim();
+    if (!f && !c) return "";
+    return f + (c ? " / " + c : "");
+  }
+  function baserailSummary(w) {
+    var b = (w.baserail || "").trim(), c = (w.baserailColour || "").trim();
+    if (!b && !c) return "";
+    return b + (c ? " / " + c : "");
   }
   function clothTab(job) {
     var ws = activeWindows(job);
@@ -1291,9 +1395,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var cw = clothWidth(w.faceRec, w.width);
       return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") + '</td><td>' + esc(w.faceRec || "") +
         '</td><td class="mono strong">' + mm(cw) + '</td><td class="mono">' + mm(clothDrop(w.drop)) +
-        '</td><td class="mono">' + mm(tubeLength(w.faceRec, w.width)) + '</td><td class="mono">' + mm(baserail(w.faceRec, w.width)) + '</td></tr>';
+        '</td><td class="mono">' + mm(tubeLength(w.faceRec, w.width)) + '</td><td class="mono">' + mm(baserail(w.faceRec, w.width)) +
+        '</td><td>' + esc(fabricSummary(w) || "—") + '</td><td>' + esc(baserailSummary(w) || "—") + '</td><td class="mono">' + esc(w.roll || "—") + '</td></tr>';
     }).join("");
-    var content = ws.length ? '<table class="grid cut"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail</th></tr></thead><tbody>' + rows + '</tbody></table>'
+    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
@@ -1763,6 +1868,87 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function pd() { if (!priceDraft) startPriceDraft(); return priceDraft; }
   function markDirty() { priceDirty = true; }
 
+  function syncSavedTag() {
+    /* flip the header control between "All changes saved" and Save/Undo without disturbing focus */
+    var host = document.querySelector(".pagehead .headctrls");
+    if (!host) return;
+    var dirty = fabricDirty();
+    var hasButtons = !!host.querySelector('[data-action="fabrics-save"]');
+    if (dirty && !hasButtons) {
+      host.innerHTML = '<button class="btn" data-action="fabrics-undo">Undo changes</button>' +
+        '<button class="btn primary" data-action="fabrics-save">Save changes</button>';
+    } else if (!dirty && hasButtons) {
+      host.innerHTML = '<span class="savedtag">All changes saved</span>';
+    }
+  }
+  /* ---------- Fabrics management tab ---------- */
+  var fabricDraft = null;   /* working copy while editing */
+  function fabricDirty() { return fabricDraft && JSON.stringify(fabricDraft) !== JSON.stringify(fabricSettings); }
+  function ensureFabricDraft() { if (!fabricDraft) fabricDraft = JSON.parse(JSON.stringify(fabricSettings)); return fabricDraft; }
+  function renderFabrics() {
+    var d = ensureFabricDraft();
+    var fabRows = d.fabrics.map(function (f, fi) {
+      var chips = f.colours.map(function (c, ci) {
+        return '<span class="colchip"><input value="' + esc(c) + '" data-fabcol="' + fi + '_' + ci + '" placeholder="colour">' +
+          '<button class="chipx" data-fabcoldel="' + fi + '_' + ci + '" title="Remove colour" aria-label="Remove colour">\u00d7</button></span>';
+      }).join("");
+      return '<div class="fabblock">' +
+        '<div class="fabhd">' +
+          '<input class="fabname" value="' + esc(f.name) + '" data-fabname="' + fi + '" placeholder="Fabric name">' +
+          '<button class="iconbtn del" data-fabdel="' + fi + '" title="Remove fabric" aria-label="Remove fabric">\u{1F5D1}</button>' +
+        '</div>' +
+        '<div class="colrow">' + chips +
+          '<button class="btn small ghost" data-fabcoladd="' + fi + '">+ colour</button>' +
+        '</div></div>';
+    }).join("");
+    var baseRows = d.baserails.map(function (b, bi) {
+      var chips = b.colours.map(function (c, ci) {
+        return '<span class="colchip"><input value="' + esc(c) + '" data-basecol="' + bi + '_' + ci + '" placeholder="colour">' +
+          '<button class="chipx" data-basecoldel="' + bi + '_' + ci + '" title="Remove colour" aria-label="Remove colour">\u00d7</button></span>';
+      }).join("");
+      return '<div class="fabblock">' +
+        '<div class="fabhd">' +
+          '<input class="fabname" value="' + esc(b.type) + '" data-basename="' + bi + '" placeholder="Baserail type">' +
+          '<button class="iconbtn del" data-basedel="' + bi + '" title="Remove baserail" aria-label="Remove baserail">\u{1F5D1}</button>' +
+        '</div>' +
+        '<div class="colrow">' + chips +
+          '<button class="btn small ghost" data-basecoladd="' + bi + '">+ colour</button>' +
+        '</div></div>';
+    }).join("");
+    var dirty = fabricDirty();
+    app.innerHTML = topbar("fabrics") + '<main class="wrap">' +
+      '<div class="pagehead"><div><h1>Fabrics &amp; baserails</h1>' +
+      '<p class="sub">These fill the Fabric, Colour and Baserail drop-downs on each window.</p></div>' +
+      '<div class="headctrls">' +
+      (dirty ? '<button class="btn" data-action="fabrics-undo">Undo changes</button>' +
+               '<button class="btn primary" data-action="fabrics-save">Save changes</button>'
+             : '<span class="savedtag">All changes saved</span>') +
+      '</div></div>' +
+      '<div class="card pad"><div class="cardbar"><div><b>Fabrics</b> <span class="dim">— ' + d.fabrics.length + '</span></div>' +
+        '<button class="btn small" data-action="fabric-add">+ Add fabric</button></div>' +
+        (d.fabrics.length ? fabRows : '<p class="dim">No fabrics yet. Add one to get started.</p>') + '</div>' +
+      '<div class="card pad"><div class="cardbar"><div><b>Baserails</b> <span class="dim">— ' + d.baserails.length + '</span></div>' +
+        '<button class="btn small" data-action="baserail-add">+ Add baserail</button></div>' +
+        (d.baserails.length ? baseRows : '<p class="dim">No baserails yet. Add one to get started.</p>') + '</div>' +
+      (dirty ? '<p class="hint">Changes are not live until you press <b>Save changes</b>.</p>' : '') +
+      '</main>' + footer();
+  }
+  async function saveFabricsDraft() {
+    // strip blank names/colours before saving
+    var clean = { fabrics: [], baserails: [] };
+    (fabricDraft.fabrics || []).forEach(function (f) {
+      var name = (f.name || "").trim(); if (!name) return;
+      clean.fabrics.push({ name: name, colours: (f.colours || []).map(function (c) { return (c || "").trim(); }).filter(Boolean) });
+    });
+    (fabricDraft.baserails || []).forEach(function (b) {
+      var type = (b.type || "").trim(); if (!type) return;
+      clean.baserails.push({ type: type, colours: (b.colours || []).map(function (c) { return (c || "").trim(); }).filter(Boolean) });
+    });
+    fabricSettings = clean;
+    var okSave = await saveFabricSettings();
+    if (okSave) { fabricDraft = null; toast("Fabrics saved."); render(); }
+  }
+
   function renderPrices() {
     var L = currentList();
     var P = pd();
@@ -2059,11 +2245,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var rows = ws.map(function (w, i) {
       return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") + '</td><td>' + esc(w.faceRec || "") +
         '</td><td>' + mm(clothWidth(w.faceRec, w.width)) + '</td><td>' + mm(clothDrop(w.drop)) +
-        '</td><td>' + mm(tubeLength(w.faceRec, w.width)) + '</td><td>' + mm(baserail(w.faceRec, w.width)) + '</td></tr>';
+        '</td><td>' + mm(tubeLength(w.faceRec, w.width)) + '</td><td>' + mm(baserail(w.faceRec, w.width)) +
+        '</td><td>' + esc(fabricSummary(w) || "") + '</td><td>' + esc(baserailSummary(w) || "") + '</td><td>' + esc(w.roll || "") + '</td></tr>';
     }).join("");
     doPrint('<div class="p-cut"><div class="p-head"><h2>Cloth Cut List</h2><div class="p-meta"><div><b>' + esc(job.jobName || "") + '</b></div><div>' +
       esc(client ? client.name : "") + ' · ' + esc(job.sanRef || "") + ' · ' + esc(job.clientRef || "") + '</div><div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
-      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
   }
   function printLabels(job) {
     var ws = activeWindows(job), cells = [];
@@ -2327,7 +2514,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
-      "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client],.m-close,[data-msave]");
+      "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client]," +
+      "[data-fabdel],[data-basedel],[data-fabcoladd],[data-basecoladd],[data-fabcoldel],[data-basecoldel]," +
+      ".m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
@@ -2348,6 +2537,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     else if (t.hasAttribute("data-fav-client")) toggleFavourite(t.getAttribute("data-fav-client"));
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
+    else if (t.hasAttribute("data-fabdel")) { ensureFabricDraft().fabrics.splice(+t.getAttribute("data-fabdel"), 1); render(); }
+    else if (t.hasAttribute("data-basedel")) { ensureFabricDraft().baserails.splice(+t.getAttribute("data-basedel"), 1); render(); }
+    else if (t.hasAttribute("data-fabcoladd")) { ensureFabricDraft().fabrics[+t.getAttribute("data-fabcoladd")].colours.push(""); render(); }
+    else if (t.hasAttribute("data-basecoladd")) { ensureFabricDraft().baserails[+t.getAttribute("data-basecoladd")].colours.push(""); render(); }
+    else if (t.hasAttribute("data-fabcoldel")) { var fp = t.getAttribute("data-fabcoldel").split("_"); ensureFabricDraft().fabrics[+fp[0]].colours.splice(+fp[1], 1); render(); }
+    else if (t.hasAttribute("data-basecoldel")) { var bp = t.getAttribute("data-basecoldel").split("_"); ensureFabricDraft().baserails[+bp[0]].colours.splice(+bp[1], 1); render(); }
     else if (t.hasAttribute("data-del-holiday")) deleteHoliday(t.getAttribute("data-del-holiday"));
     else if (t.hasAttribute("data-del-hgroup")) deleteHolidayGroup(t.getAttribute("data-del-hgroup"));
     else if (t.hasAttribute("data-qtoggle")) {
@@ -2405,6 +2600,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
       else if (a === "print-labels") printLabels(getJob(state.jobId));
       else if (a === "addholiday") addHoliday();
+      else if (a === "fabrics-save") saveFabricsDraft();
+      else if (a === "fabrics-undo") { fabricDraft = null; render(); }
+      else if (a === "fabric-add") { ensureFabricDraft().fabrics.push({ name: "", colours: [] }); render(); }
+      else if (a === "baserail-add") { ensureFabricDraft().baserails.push({ type: "", colours: [] }); render(); }
       else if (a === "price-save") savePrices();
       else if (a === "price-revert") revertPrices();
       else if (a === "price-newlist") newPriceList();
@@ -2497,6 +2696,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (jN) { noteChanged(jN, el.value); jN.clientNote = el.value; queueJobPatch(jN.id, "client_note", el.value); }
       return;
     }
+    if (el.hasAttribute("data-fabname")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabname")].name = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute("data-basename")) { ensureFabricDraft().baserails[+el.getAttribute("data-basename")].type = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute("data-fabcol")) { var fc = el.getAttribute("data-fabcol").split("_"); ensureFabricDraft().fabrics[+fc[0]].colours[+fc[1]] = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute("data-basecol")) { var bc = el.getAttribute("data-basecol").split("_"); ensureFabricDraft().baserails[+bc[0]].colours[+bc[1]] = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-job-field")) {
       var f = el.getAttribute("data-job-field"); job[f] = el.value; if (FIELD_COL[f]) queueJobPatch(job.id, FIELD_COL[f], el.value);
     } else if (el.hasAttribute("data-win")) {
@@ -2567,9 +2770,31 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.hasAttribute("data-job-client")) { job.clientId = el.value || null; queueJobPatch(job.id, "client_id", job.clientId); render(); }
     else if (el.getAttribute("data-job-field") === "status") { job.status = el.value; queueJobPatch(job.id, "status", el.value); render(); }
     else if (el.getAttribute("data-job-field") === "dateReceived") { job.dateReceived = el.value; queueJobPatch(job.id, "date_received", el.value); render(); }
-    else if (el.hasAttribute("data-win") && el.getAttribute("data-wf") === "faceRec") {
+    else if (el.hasAttribute("data-win")) {
+      var wf = el.getAttribute("data-wf");
       var w = job.windows.filter(function (x) { return x.id === el.getAttribute("data-win"); })[0];
-      if (w) { w.faceRec = el.value; saveWindows(job); }
+      if (!w) return;
+      if (wf === "fabricCustom") {
+        w.fabricCustom = el.checked;
+        /* switching to one-off keeps any typed text; switching back keeps chosen values */
+        saveWindows(job); render(); return;
+      }
+      if (wf === "fabric") {
+        w.fabric = el.value;
+        /* clear a colour that no longer belongs to the newly chosen fabric */
+        if (w.fabricColour && fabricColours(w.fabric).indexOf(w.fabricColour) === -1) w.fabricColour = "";
+        saveWindows(job); render(); return;
+      }
+      if (wf === "baserail") {
+        w.baserail = el.value;
+        if (w.baserailColour && baserailColours(w.baserail).indexOf(w.baserailColour) === -1) w.baserailColour = "";
+        saveWindows(job); render(); return;
+      }
+      if (wf === "faceRec" || wf === "fabricColour" || wf === "baserailColour" || wf === "roll") {
+        w[wf] = el.value; saveWindows(job);
+        if (wf === "faceRec") return; /* faceRec affects cut list, but no dropdown depends on it here */
+        return;
+      }
     }
   });
 
