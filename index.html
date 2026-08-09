@@ -789,6 +789,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   async function saveFabricSettings() {
     var payload = { key: "blind_fabrics", data: fabricSettings, updated_at: new Date().toISOString() };
+    markLocalWrite();
     var r = await db.from("app_settings").upsert(payload, { onConflict: "key" });
     if (r.error) toast("Could not save fabrics. " + (r.error.message || ""));
     return !r.error;
@@ -851,13 +852,23 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       .subscribe();
   }
   var remoteT;
+  var lastLocalWrite = 0;
+  function markLocalWrite() { lastLocalWrite = Date.now(); }
   function onRemoteChange() {
     clearTimeout(remoteT);
     remoteT = setTimeout(async function () {
+      /* If this broadcast is just the echo of something we ourselves saved a
+         moment ago, our local copy is already correct — reloading and
+         re-rendering here is what makes a just-picked dropdown flicker back.
+         Skip it. Genuine changes from another staff member arrive later than
+         this window and still come through. */
+      if (Date.now() - lastLocalWrite < 2500) return;
       try { await loadAll(); } catch (e) { return; }
+      /* Never rebuild the screen out from under someone mid-edit — this covers
+         text boxes (INPUT/TEXTAREA) and drop-downs (SELECT). */
       var el = document.activeElement;
-      var typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
-      if (!typing) render();
+      var editing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT");
+      if (!editing) render();
     }, 250);
   }
 
@@ -873,6 +884,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   async function flushJobPatch(id) {
     var patch = pending[id]; if (!patch) return;
     delete pending[id];
+    markLocalWrite();
     var r = await db.from("jobs").update(patch).eq("id", id);
     if (r.error) { setSaveState("idle"); toast("Save failed — check your connection."); }
     else setSaveState("saved");
@@ -959,8 +971,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     qPatchT[id] = setTimeout(function () { flushQuotePatch(id); }, 700);
   }
   async function flushQuotePatch(id) {
+    markLocalWrite();
     var patch = qPending[id]; if (!patch) return;
     delete qPending[id];
+    markLocalWrite();
     var r = await db.from("quotes").update(patch).eq("id", id);
     if (r.error) { setSaveState("idle"); toast("Save failed — check your connection."); }
     else setSaveState("saved");
@@ -1750,6 +1764,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       price_list_id: currentList() ? currentList().id : null,
       created_by: defaultAuthor()
     };
+    markLocalWrite();
     var r = await db.from("quotes").insert(row).select().single();
     if (r.error) { toast("Could not create quote."); return; }
     quotes.unshift(toAppQuote(r.data));
@@ -1758,6 +1773,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   async function deleteQuote(id) {
     var q = getQuote(id);
     if (!q || !confirm('Delete quote “' + (q.jobName || q.ref || "Untitled") + '”? This cannot be undone.')) return;
+    markLocalWrite();
     var r = await db.from("quotes").delete().eq("id", id);
     if (r.error) { toast("Delete failed."); return; }
     quotes = quotes.filter(function (x) { return x.id !== id; }); render();
@@ -2208,6 +2224,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   async function savePrices() {
     var L = currentList();
     if (!L) { toast("No price list to save to."); return; }
+    markLocalWrite();
     var r = await db.from("price_lists").update({ data: pd() }).eq("id", L.id);
     if (r.error) { toast("Could not save prices."); return; }
     L.data = JSON.parse(JSON.stringify(pd()));
@@ -2222,12 +2239,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var from = (document.getElementById("pl-date") || {}).value || todayISO();
     if (!name.trim()) { toast("Give the new price list a name first."); return; }
     if (!confirm('Start "' + name + '"?\n\nQuotes already written keep their current prices. New quotes will use this list.')) return;
+    markLocalWrite();
     var r = await db.from("price_lists").insert({
       name: name, effective_from: from, is_current: true, data: pd()
     }).select().single();
     if (r.error) { toast("Could not create the new price list."); return; }
     var old = currentList();
     if (old) {
+      markLocalWrite();
       var r2 = await db.from("price_lists").update({ is_current: false }).eq("id", old.id);
       if (!r2.error) old.is_current = false;
     }
@@ -2289,6 +2308,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       job_name: "", job_address: "", date_received: todayISO(), status: "Not Started",
       notes: "", windows: [{ id: uid(), name: "", faceRec: "", width: "", drop: "" }]
     };
+    markLocalWrite();
     var r = await db.from("jobs").insert(row).select().single();
     if (r.error) { toast("Could not create job."); return; }
     jobs.unshift(toApp(r.data));
@@ -2297,6 +2317,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   async function deleteJob(id) {
     var j = getJob(id);
     if (!j || !confirm('Delete job “' + (j.jobName || "Untitled") + '”? This cannot be undone.')) return;
+    markLocalWrite();
     var r = await db.from("jobs").delete().eq("id", id);
     if (r.error) { toast("Delete failed."); return; }
     jobs = jobs.filter(function (x) { return x.id !== id; }); render();
@@ -2304,6 +2325,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   async function saveWindows(job) { queueJobPatch(job.id, "windows", job.windows); }
 
   async function newClient() {
+    markLocalWrite();
     var r = await db.from("clients").insert({ name: "New client" }).select().single();
     if (r.error) { toast("Could not add client."); return; }
     clients.unshift(r.data); editClientDialog(r.data.id);
@@ -2332,6 +2354,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           }
           patch[o.k] = v; c[o.k] = v;
         });
+        markLocalWrite();
         var r = await db.from("clients").update(patch).eq("id", c.id);
         if (r.error) toast("Save failed."); render();
       });
@@ -2341,12 +2364,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (!c) return;
     c.is_favourite = !c.is_favourite;
     render();
+    markLocalWrite();
     var r = await db.from("clients").update({ is_favourite: c.is_favourite }).eq("id", id);
     if (r.error) { c.is_favourite = !c.is_favourite; toast("Could not update favourite."); render(); }
   }
   async function deleteClient(id) {
     if (jobs.some(function (x) { return x.clientId === id; })) { toast("This client has jobs — reassign or delete those first."); return; }
     if (!confirm("Delete this client?")) return;
+    markLocalWrite();
     var r = await db.from("clients").delete().eq("id", id);
     if (r.error) { toast("Delete failed."); return; }
     clients = clients.filter(function (x) { return x.id !== id; }); render();
@@ -2403,6 +2428,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var group = holidays.filter(function (h) { return (h.name || "").trim() === name; });
     if (!group.length) return;
     if (!confirm("Remove all " + group.length + " dates named \u201c" + name + "\u201d?")) return;
+    markLocalWrite();
     var r = await db.from("holidays").delete().eq("name", name);
     if (r.error) { toast("Could not remove those dates."); return; }
     holidays = holidays.filter(function (h) { return (h.name || "").trim() !== name; });
@@ -2410,6 +2436,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     toast(group.length + " dates removed.");
   }
   async function deleteHoliday(id) {
+    markLocalWrite();
     var r = await db.from("holidays").delete().eq("id", id);
     if (r.error) { toast("Delete failed."); return; }
     holidays = holidays.filter(function (x) { return x.id !== id; });
@@ -2445,6 +2472,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var c = getClient(id); if (!c) return;
     if (!confirm("Replace the link for " + (c.name || "this client") + "?\n\nTheir old link will stop working immediately.")) return;
     var tok = (uid() + uid()).replace(/-/g, "");
+    markLocalWrite();
     var r = await db.from("clients").update({ view_token: tok }).eq("id", id);
     if (r.error) { toast("Could not replace the link."); return; }
     c.view_token = tok;
