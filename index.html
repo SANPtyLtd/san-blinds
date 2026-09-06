@@ -393,6 +393,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   .p-logo{height:56px;width:auto}
   .p-co{font-size:11px;color:#444;text-align:right;line-height:1.6}
 }
+.pricegrid .ralign{text-align:right}
+.pricegrid .pgtag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px}
+.pricegrid tr.unpriced td{background:#fff8e8;color:#8a5a05}
+.pricegrid .pxnote{font-style:italic}
+.pricegrid .tsub td{border-top:1px solid var(--line);padding-top:8px}
+.pricegrid .ttot td{border-top:2px solid var(--ink);font-size:16px;font-weight:700;padding-top:8px}
+.pxwarn{background:#fff8e8;border:1px solid #e6c88a;color:#8a5a05;border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:13.5px}
+@media print{ .p-quote .pt-sub td{border-top:1px solid #999} .p-quote .pt-tot td{border-top:2px solid #000;font-weight:700;font-size:14px} }
 /* wider window entry table + horizontal scroll on narrow screens */
 .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .winentry{min-width:1080px}
@@ -531,9 +539,52 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         2400: [129, 135, 155, 176, 206, 258, 284, 368, 421, 478, 516],
         2700: [141, 144, 164, 186, 226, 290, 320, 399, 443, 516, 531]
       }
+    },
+    "Group C": {
+      label: "Group C",
+      widths: PRICE_WIDTHS,
+      drops: [900, 1200, 1500, 1800, 2100, 2400, 2700, 3000],
+      rows: {
+        900: [102, 138, 149, 171, 204, 241, 280, 313, 345, 406, 437],
+        1200: [109, 143, 157, 180, 211, 250, 287, 331, 361, 414, 446],
+        1500: [117, 144, 170, 199, 232, 278, 315, 369, 393, 422, 454],
+        1800: [141, 155, 186, 216, 256, 308, 346, 423, 447, 471, 502],
+        2100: [149, 165, 200, 235, 278, 338, 375, 495, 502, 516, 548],
+        2400: [159, 177, 214, 252, 301, 368, 389, 549, 564, 586, 617],
+        2700: [171, 188, 229, 271, 325, 397, 435, 604, 627, 657, 687],
+        3000: [188, 204, 244, 286, 339, 413, 450, 619, 643, 673, 703]
+      }
+    },
+    "Group D": {
+      label: "Group D",
+      widths: [930, 1230, 1530, 1830, 2130, 2430, 2730, 3030, 3300, 3500],
+      drops: [1200, 1500, 1800, 2100, 2400, 2700, 3000],
+      rows: {
+        1200: [195, 218, 250, 273, 305, 414, 501, 593, 641, 672],
+        1500: [235, 258, 273, 328, 359, 446, 570, 695, 727, 758],
+        1800: [258, 290, 320, 375, 406, 484, 633, 781, 813, 843],
+        2100: [280, 328, 368, 430, 461, 524, 704, 876, 906, 938],
+        2400: [297, 359, 414, 484, 508, 563, 774, 969, 1000, 1032],
+        2700: [328, 399, 461, 539, 563, 603, 836, 1063, 1094, 1126],
+        3000: [359, 437, 508, 586, 618, 641, 902, 1156, 1188, 1218]
+      }
+    },
+    "Group E": {
+      label: "Group E",
+      widths: [930, 1230, 1530, 1830, 2130, 2430, 2730, 3030, 3300, 3500],
+      drops: [1200, 1500, 1800, 2100, 2400, 2700, 3000],
+      rows: {
+        1200: [218, 250, 255, 320, 351, 468, 579, 688, 734, 781],
+        1500: [273, 290, 291, 375, 406, 516, 657, 797, 743, 890],
+        1800: [297, 335, 334, 430, 468, 563, 734, 898, 945, 992],
+        2100: [320, 375, 383, 501, 524, 603, 804, 1008, 1054, 1101],
+        2400: [344, 414, 434, 563, 586, 648, 883, 1117, 1163, 1211],
+        2700: [382, 461, 476, 617, 648, 695, 961, 1227, 1256, 1305],
+        3000: [414, 501, 526, 672, 704, 734, 1040, 1329, 1377, 1422]
+      }
     }
   };
-  var PRICE_GROUPS = ["Group A - Sunscreen", "Group B - Roller"];
+  var PRICE_GROUPS = ["Group A - Sunscreen", "Group B - Roller", "Group C", "Group D", "Group E"];
 
   /* Charges — edit here if any of these change */
   var INSTALL_PER_BLIND = 50;
@@ -623,6 +674,71 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       }
     }
     return currentPricing();
+  }
+  var FABRIC_GROUP_TO_GRID = {
+    "Group A": "Group A - Sunscreen",
+    "Group B": "Group B - Roller",
+    "Group C": "Group C",
+    "Group D": "Group D",
+    "Group E": "Group E"
+    /* "Other" intentionally absent -> no automatic price */
+  };
+  function fabricPriceGroup(fabricName) {
+    /* look up which price group a fabric belongs to, from the Fabrics tab */
+    var f = fabricSettings.fabrics.filter(function (x) { return x.name === fabricName; })[0];
+    return f && f.priceGroup ? f.priceGroup : "";
+  }
+  function gridKeyForWindow(w) {
+    /* one-off / custom fabric can't map to a grid; nor can a fabric with no group */
+    if (w.fabricCustom) return "";
+    var fg = fabricPriceGroup(w.fabric);
+    return FABRIC_GROUP_TO_GRID[fg] || "";
+  }
+  function clientDiscountPct(client, fabricGroup) {
+    var d = client && client.fabric_discounts;
+    if (!d || !fabricGroup) return 0;
+    var v = d[fabricGroup];
+    return (typeof v === "number" && isFinite(v) && v > 0) ? v : 0;
+  }
+  /* Price one window of a production job:
+     base (from the group's grid at width x drop) -> less client discount -> ex-GST line. */
+  function jobWindowPrice(P, client, w) {
+    var fg = w.fabricCustom ? "" : fabricPriceGroup(w.fabric);
+    var gridKey = gridKeyForWindow(w);
+    if (!gridKey) {
+      return { priced: false,
+        reason: w.fabricCustom ? "One-off fabric — price by hand"
+              : !w.fabric ? "No fabric selected"
+              : !fg ? "Fabric has no price group"
+              : "Group " + fg + " has no price grid" };
+    }
+    var r = blindPrice(P, gridKey, w.width, w.drop);
+    if (typeof r.price !== "number") return { priced: false, reason: r.error || "No price" };
+    var pct = clientDiscountPct(client, fg);
+    var base = r.price;
+    var discAmt = base * pct / 100;
+    var net = base - discAmt;
+    return { priced: true, group: fg, base: base, pct: pct, discount: discAmt, net: net, wBand: r.wBand, dBand: r.dBand };
+  }
+  /* Whole-job pricing: sum the net lines, then add GST at the end. */
+  function jobPricing(job) {
+    var P = currentPricing();
+    var client = getClient(job.clientId);
+    var gstRate = (P && isFinite(P.gstRate)) ? P.gstRate : 0.10;
+    var lines = (job.windows || []).filter(function (w) {
+      return (w.name || "").trim() || Number(w.width) || Number(w.drop) || w.fabric;
+    }).map(function (w) {
+      var pr = jobWindowPrice(P, client, w);
+      return { w: w, pr: pr };
+    });
+    var netTotal = 0, anyPriced = false, anyUnpriced = false;
+    lines.forEach(function (L) {
+      if (L.pr.priced) { netTotal += L.pr.net; anyPriced = true; }
+      else anyUnpriced = true;
+    });
+    var gst = netTotal * gstRate;
+    return { lines: lines, client: client, netTotal: netTotal, gstRate: gstRate, gst: gst,
+             total: netTotal + gst, anyPriced: anyPriced, anyUnpriced: anyUnpriced };
   }
   function groupOf(P, key) {
     for (var i = 0; i < P.groups.length; i++) if (P.groups[i].key === key) return P.groups[i];
@@ -774,7 +890,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
   /* ---------- blind fabrics + baserails ---------- */
   var BUILTIN_FABRICS = { fabrics: [{"name": "Vibe", "colours": ["Tundra", "Nimbus", "Alloy", "Surf", "Mist", "Terrace", "Limestone", "Pure", "Lace", "Cloud", "Birch", "Loft", "Porcelain", "Linen", "Moon", "Spirit", "Dune", "Dbistro", "Chateau", "Stone", "Clay", "Umber", "Odessey", "Orient", "Coal", "Lava Metallic", "Mercury Metallic", "Brulee Metallic", "Storm", "Whisper", "Ice"]}, {"name": "Aventus 5%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 3%", "colours": ["White", "White Stone", "White Grey", "Charcoal Grey", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 10%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Linesque Blockout", "colours": ["Almond", "Aspen", "Blanco", "Breeze", "Denim", "Dove", "Fig", "Fleece", "Fossil", "Raffia", "Soba", "Vine"]}, {"name": "Linesque Light Filtering", "colours": ["Lily", "Oatcake", "Wicker", "Hazel", "Trellis", "Chestnut", "Owl", "Winter", "Delta", "Granite", "Stonewash", "Levi"]}, {"name": "Endota", "colours": ["Optic", "Natural White", "Almond", "Cashmere", "Pastel", "Soft Sable", "Eucalypt", "Smokey", "Flagstone", "Gentle Grey", "Cool Black"]}, {"name": "Le Reve Blockout", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Le Reve Light Filtering", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Mantra Blockout", "colours": ["Cotton", "Opal", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Spice", "Flint", "Pebble", "Shale"]}, {"name": "Mantra Light Filtering", "colours": ["Cotton", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Pebble", "Shale"]}, {"name": "Skye Blockout", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Skye Light Filtering", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Palm Beach Blockout", "colours": ["Quill", "Lyric", "Merino", "Jasmine", "Gull", "Porpoise", "Urben", "Thunder", "Summer Storm", "Iron", "Dusk", "Quartz"]}, {"name": "Palm Beach Light Filtering", "colours": ["Melody", "Horizon", "Angora", "Pearl", "Monsoon", "Steel", "Ink"]}, {"name": "Duo Block 3.0", "colours": ["Aztec", "Basalt", "Calm", "Carbon", "Cumulus", "Dove", "Muse", "Nova", "Stella", "Salt"]}, {"name": "Duo Light", "colours": ["Bright White", "Warm White", "Mid Grey"]}, {"name": "Duo Screen", "colours": ["White", "White Stone", "White Linen", "Dune Grey", "White Grey", "Blue Grey", "Charcoal Grey", "Charcoal Slate", "Charcoal"]}, {"name": "Edge", "colours": ["Alabaster", "Ammonite", "Bright", "Calico", "Charcoal", "Ironstone", "Pumice", "Soft Grey"]}, {"name": "Bond", "colours": ["Ice", "Chalk", "Linen", "Taupe", "Cloud", "Concrete", "Granite", "Charcoal"]}, {"name": "Resene Origin", "colours": ["All Black", "Baltic Sea", "Double Stack", "Surrender", "Concrete", "Alabaster", "Black White", "Rice Cake", "Quarter Tea", "Truffle", "Masala", "Bokara Grey"]}, {"name": "St Lucia", "colours": ["Arctic", "Ice", "White", "Stone", "Silver", "Charcoal"]}, {"name": "SB Opulence", "colours": ["White", "Taupe Grey", "Alabaster", "Silver", "Ivory", "Haze", "Champagne", "Shadow", "Merino", "Black"]}, {"name": "Tasman", "colours": ["Ice", "Ivory", "Beech", "Platinium", "Domino", "Storm", "Graphite", "Skyline", "Shadow"]}, {"name": "Woolamai", "colours": ["Cloud", "Silver", "Sand", "Storm", "Driftwood", "Basalt", "Stone", "Onyx"]}, {"name": "Dawn", "colours": ["White", "Linen", "Oyster", "Warm White", "Custom Cream", "Natural", "Angora", "Gosling", "Ecru", "Pannacotta", "Birch", "Thunder", "Soft Grey", "Daybreak", "Cotton", "Ash Blue", "Grey", "Mid Grey", "Crane", "Dark Grey", "Black", "Arum", "Mariah", "Putty", "Misty", "Alabaster", "Ivory", "Sesame", "Dune", "Earthen", "Pewter", "Light Bison", "Slate"]}], baserails: [{"type": "Elipse", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "D30 Silent", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone", "Matt Black", "Matt White"]}, {"type": "Minimal", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "Lathe", "colours": ["Timber"]}] };
-  var PRICE_GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Other"];
+  var FABRIC_GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Other"];
   var fabricSettings = { fabrics: [], baserails: [] };
   function normaliseFabrics(d) {
     var out = { fabrics: [], baserails: [] };
@@ -1317,12 +1433,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var job = getJob(state.jobId);
     if (!job) { state.view = "dashboard"; return render(); }
     var client = getClient(job.clientId);
-    var tabs = [["info", "Job info"], ["windows", "Windows"], ["cloth", "Cloth cut list"], ["labels", "Labels"]];
+    var tabs = [["info", "Job info"], ["windows", "Windows"], ["cloth", "Cloth cut list"], ["labels", "Labels"], ["pricing", "Pricing"]];
     var tabbar = tabs.map(function (t) { return '<button class="tab ' + (state.tab === t[0] ? "on" : "") + '" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join("");
     var body = state.tab === "info" ? jobInfoTab(job, client)
       : state.tab === "windows" ? windowsTab(job)
         : state.tab === "cloth" ? clothTab(job)
-          : labelsTab(job);
+          : state.tab === "pricing" ? pricingTab(job)
+            : labelsTab(job);
     app.innerHTML = topbar("dashboard") + '<main class="wrap">' +
       '<div class="crumbs"><button class="link" data-go="dashboard">← All jobs</button></div>' +
       '<div class="jobhead"><div><h1>' + esc(job.jobName || "Untitled job") + '</h1>' +
@@ -1413,6 +1530,78 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var b = (w.baserail || "").trim(), c = (w.baserailColour || "").trim();
     if (!b && !c) return "";
     return b + (c ? " / " + c : "");
+  }
+  function pricingTab(job) {
+    var pr = jobPricing(job);
+    var client = pr.client;
+    if (!pr.lines.length) {
+      return '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab, choose a fabric for each, and the pricing appears here.</p></div>';
+    }
+    var rows = pr.lines.map(function (L, i) {
+      var w = L.w, p = L.pr;
+      if (!p.priced) {
+        return '<tr class="unpriced"><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td>' +
+          '<td>' + esc(fabricSummary(w) || "—") + '</td><td class="mono">' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
+          '<td colspan="4" class="pxnote">' + esc(p.reason) + '</td></tr>';
+      }
+      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td>' +
+        '<td>' + esc(fabricSummary(w) || "—") + ' <span class="pgtag">' + esc(p.group) + '</span></td>' +
+        '<td class="mono">' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
+        '<td class="mono ralign">' + money(p.base) + '</td>' +
+        '<td class="mono ralign">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
+        '<td class="mono ralign">' + (p.discount ? "−" + money(p.discount) : "—") + '</td>' +
+        '<td class="mono ralign strong">' + money(p.net) + '</td></tr>';
+    }).join("");
+
+    var totals =
+      '<tr class="tsub"><td colspan="7" class="ralign">Subtotal (excl GST)</td><td class="mono ralign strong">' + money(pr.netTotal) + '</td></tr>' +
+      '<tr class="tsub"><td colspan="7" class="ralign">GST (' + Math.round(pr.gstRate * 100) + '%)</td><td class="mono ralign">' + money(pr.gst) + '</td></tr>' +
+      '<tr class="ttot"><td colspan="7" class="ralign">Total (incl GST)</td><td class="mono ralign strong">' + money(pr.total) + '</td></tr>';
+
+    var warn = pr.anyUnpriced ? '<div class="pxwarn">Some windows aren\u2019t priced automatically (shown above). They\u2019re not included in the total — price those by hand.</div>' : "";
+    var noDisc = (client && client.fabric_discounts && Object.keys(client.fabric_discounts).length) ? "" :
+      '<div class="ruleline">This client has no fabric-group discounts set. Add them on the client\u2019s Edit screen if needed.</div>';
+
+    return '<div class="card"><div class="cardbar"><div><b>Pricing</b> <span class="dim">— ' + esc(client ? client.name : "no client") + '</span></div>' +
+      '<button class="btn primary" data-action="print-pricing">Print pricing</button></div>' +
+      warn +
+      '<div class="tablescroll"><table class="grid pricegrid"><thead><tr><th>#</th><th>Window</th><th>Fabric</th><th>Size (mm)</th>' +
+      '<th class="ralign">Base</th><th class="ralign">Disc</th><th class="ralign">Less</th><th class="ralign">Net</th></tr></thead>' +
+      '<tbody>' + rows + totals + '</tbody></table></div></div>' +
+      noDisc +
+      '<div class="ruleline">Each window: base price (from its fabric\u2019s group grid at the next size band up) − this client\u2019s discount for that group. GST added on the subtotal.</div>';
+  }
+  function printPricing(job) {
+    var pr = jobPricing(job);
+    var client = pr.client;
+    var rows = pr.lines.map(function (L, i) {
+      var w = L.w, p = L.pr;
+      if (!p.priced) {
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td><td>' + esc(fabricSummary(w) || "") +
+          '</td><td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td><td colspan="4">' + esc(p.reason) + '</td></tr>';
+      }
+      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td>' +
+        '<td>' + esc(fabricSummary(w)) + ' (' + esc(p.group) + ')</td>' +
+        '<td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
+        '<td class="ra">' + money(p.base) + '</td><td class="ra">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
+        '<td class="ra">' + (p.discount ? "−" + money(p.discount) : "—") + '</td><td class="ra">' + money(p.net) + '</td></tr>';
+    }).join("");
+    var totals =
+      '<tr class="pt-sub"><td colspan="7" class="ra">Subtotal (excl GST)</td><td class="ra">' + money(pr.netTotal) + '</td></tr>' +
+      '<tr class="pt-sub"><td colspan="7" class="ra">GST (' + Math.round(pr.gstRate * 100) + '%)</td><td class="ra">' + money(pr.gst) + '</td></tr>' +
+      '<tr class="pt-tot"><td colspan="7" class="ra">Total (incl GST)</td><td class="ra">' + money(pr.total) + '</td></tr>';
+    doPrint('<div class="p-quote"><div class="p-brand"><img class="p-logo" src="' + LOGO_PRINT + '" alt="SAN Pty Ltd">' +
+      '<div class="p-co">' + esc(COMPANY.address) + '<br>Ph ' + esc(COMPANY.phone) + ' · ' + esc(COMPANY.email) + '</div></div>' +
+      '<div class="p-head"><h2>Order Pricing</h2><div class="p-meta">' +
+      '<div><b>' + esc(job.jobName || "") + '</b></div>' +
+      '<div>' + esc(client ? client.name : "") + (job.sanRef ? ' · ' + esc(job.sanRef) : "") + '</div>' +
+      (job.jobAddress ? '<div>' + esc(job.jobAddress) + '</div>' : "") +
+      '<div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
+      '<table class="p-grid qgrid"><thead><tr><th>#</th><th>Window</th><th>Fabric</th><th>Size</th>' +
+      '<th class="ra">Base</th><th class="ra">Disc</th><th class="ra">Less</th><th class="ra">Net</th></tr></thead>' +
+      '<tbody>' + rows + totals + '</tbody></table>' +
+      (pr.anyUnpriced ? '<p class="p-foot">Windows shown without a price need pricing by hand and are not included in the total.</p>' : "") +
+      '<p class="p-foot">' + esc(companyLine()) + '</p></div>');
   }
   function clothTab(job) {
     var ws = activeWindows(job);
@@ -1919,7 +2108,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         return '<span class="colchip"><input value="' + esc(c) + '" data-fabcol="' + fi + '_' + ci + '" placeholder="colour">' +
           '<button class="chipx" data-fabcoldel="' + fi + '_' + ci + '" title="Remove colour" aria-label="Remove colour">\u00d7</button></span>';
       }).join("");
-      var grpOpts = '<option value="">Price group…</option>' + PRICE_GROUPS.map(function (g) { return '<option ' + (g === f.priceGroup ? "selected" : "") + '>' + esc(g) + '</option>'; }).join("");
+      var grpOpts = '<option value="">Price group…</option>' + FABRIC_GROUPS.map(function (g) { return '<option ' + (g === f.priceGroup ? "selected" : "") + '>' + esc(g) + '</option>'; }).join("");
       return '<div class="fabblock">' +
         '<div class="fabhd">' +
           '<input class="fabname" value="' + esc(f.name) + '" data-fabname="' + fi + '" placeholder="Fabric name">' +
@@ -2350,7 +2539,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function discountGrid(c) {
     var disc = clientDiscounts(c);
-    var rows = PRICE_GROUPS.map(function (g) {
+    var rows = FABRIC_GROUPS.map(function (g) {
       var v = (disc[g] === 0 || disc[g]) ? disc[g] : "";
       return '<div class="discrow"><span class="disclbl">' + esc(g) + '</span>' +
         '<span class="discinput"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" ' +
@@ -2665,6 +2854,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "clientview") { state.clientView = t.checked; render(); }
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
+      else if (a === "print-pricing") printPricing(getJob(state.jobId));
       else if (a === "print-labels") printLabels(getJob(state.jobId));
       else if (a === "addholiday") addHoliday();
       else if (a === "fabrics-save") saveFabricsDraft();
