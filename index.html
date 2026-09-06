@@ -417,6 +417,16 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .btn.ghost{background:transparent;border:1px dashed var(--line);color:var(--dim)}
 .btn.ghost:hover{border-color:var(--teal);color:var(--teal)}
 .savedtag{color:#1d7a45;font-weight:600;font-size:13px;padding:8px 4px}
+.grpsel{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13.5px;color:var(--ink)}
+.discwrap{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.dischd{font-weight:700;font-size:14px;margin-bottom:4px}
+.discgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px}
+.discrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.disclbl{font-size:14px;color:var(--ink)}
+.discinput{display:inline-flex;align-items:center;gap:4px}
+.discinput input{width:72px;text-align:right;border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-family:inherit;font-size:14px}
+.discinput .pct{color:var(--dim);font-size:13px}
+@media (max-width:640px){.discgrid{grid-template-columns:1fr}}
 @media (max-width:1024px){.colchip input{width:88px}}
 
 .notebadge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:30px;height:30px;
@@ -764,12 +774,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
   /* ---------- blind fabrics + baserails ---------- */
   var BUILTIN_FABRICS = { fabrics: [{"name": "Vibe", "colours": ["Tundra", "Nimbus", "Alloy", "Surf", "Mist", "Terrace", "Limestone", "Pure", "Lace", "Cloud", "Birch", "Loft", "Porcelain", "Linen", "Moon", "Spirit", "Dune", "Dbistro", "Chateau", "Stone", "Clay", "Umber", "Odessey", "Orient", "Coal", "Lava Metallic", "Mercury Metallic", "Brulee Metallic", "Storm", "Whisper", "Ice"]}, {"name": "Aventus 5%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 3%", "colours": ["White", "White Stone", "White Grey", "Charcoal Grey", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 10%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Linesque Blockout", "colours": ["Almond", "Aspen", "Blanco", "Breeze", "Denim", "Dove", "Fig", "Fleece", "Fossil", "Raffia", "Soba", "Vine"]}, {"name": "Linesque Light Filtering", "colours": ["Lily", "Oatcake", "Wicker", "Hazel", "Trellis", "Chestnut", "Owl", "Winter", "Delta", "Granite", "Stonewash", "Levi"]}, {"name": "Endota", "colours": ["Optic", "Natural White", "Almond", "Cashmere", "Pastel", "Soft Sable", "Eucalypt", "Smokey", "Flagstone", "Gentle Grey", "Cool Black"]}, {"name": "Le Reve Blockout", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Le Reve Light Filtering", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Mantra Blockout", "colours": ["Cotton", "Opal", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Spice", "Flint", "Pebble", "Shale"]}, {"name": "Mantra Light Filtering", "colours": ["Cotton", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Pebble", "Shale"]}, {"name": "Skye Blockout", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Skye Light Filtering", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Palm Beach Blockout", "colours": ["Quill", "Lyric", "Merino", "Jasmine", "Gull", "Porpoise", "Urben", "Thunder", "Summer Storm", "Iron", "Dusk", "Quartz"]}, {"name": "Palm Beach Light Filtering", "colours": ["Melody", "Horizon", "Angora", "Pearl", "Monsoon", "Steel", "Ink"]}, {"name": "Duo Block 3.0", "colours": ["Aztec", "Basalt", "Calm", "Carbon", "Cumulus", "Dove", "Muse", "Nova", "Stella", "Salt"]}, {"name": "Duo Light", "colours": ["Bright White", "Warm White", "Mid Grey"]}, {"name": "Duo Screen", "colours": ["White", "White Stone", "White Linen", "Dune Grey", "White Grey", "Blue Grey", "Charcoal Grey", "Charcoal Slate", "Charcoal"]}, {"name": "Edge", "colours": ["Alabaster", "Ammonite", "Bright", "Calico", "Charcoal", "Ironstone", "Pumice", "Soft Grey"]}, {"name": "Bond", "colours": ["Ice", "Chalk", "Linen", "Taupe", "Cloud", "Concrete", "Granite", "Charcoal"]}, {"name": "Resene Origin", "colours": ["All Black", "Baltic Sea", "Double Stack", "Surrender", "Concrete", "Alabaster", "Black White", "Rice Cake", "Quarter Tea", "Truffle", "Masala", "Bokara Grey"]}, {"name": "St Lucia", "colours": ["Arctic", "Ice", "White", "Stone", "Silver", "Charcoal"]}, {"name": "SB Opulence", "colours": ["White", "Taupe Grey", "Alabaster", "Silver", "Ivory", "Haze", "Champagne", "Shadow", "Merino", "Black"]}, {"name": "Tasman", "colours": ["Ice", "Ivory", "Beech", "Platinium", "Domino", "Storm", "Graphite", "Skyline", "Shadow"]}, {"name": "Woolamai", "colours": ["Cloud", "Silver", "Sand", "Storm", "Driftwood", "Basalt", "Stone", "Onyx"]}, {"name": "Dawn", "colours": ["White", "Linen", "Oyster", "Warm White", "Custom Cream", "Natural", "Angora", "Gosling", "Ecru", "Pannacotta", "Birch", "Thunder", "Soft Grey", "Daybreak", "Cotton", "Ash Blue", "Grey", "Mid Grey", "Crane", "Dark Grey", "Black", "Arum", "Mariah", "Putty", "Misty", "Alabaster", "Ivory", "Sesame", "Dune", "Earthen", "Pewter", "Light Bison", "Slate"]}], baserails: [{"type": "Elipse", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "D30 Silent", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone", "Matt Black", "Matt White"]}, {"type": "Minimal", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "Lathe", "colours": ["Timber"]}] };
+  var PRICE_GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Other"];
   var fabricSettings = { fabrics: [], baserails: [] };
   function normaliseFabrics(d) {
     var out = { fabrics: [], baserails: [] };
     if (d && Array.isArray(d.fabrics)) {
       out.fabrics = d.fabrics.filter(function (f) { return f && f.name; }).map(function (f) {
-        return { name: String(f.name), colours: Array.isArray(f.colours) ? f.colours.map(String) : [] };
+        return { name: String(f.name), priceGroup: f.priceGroup ? String(f.priceGroup) : "", colours: Array.isArray(f.colours) ? f.colours.map(String) : [] };
       });
     }
     if (d && Array.isArray(d.baserails)) {
@@ -1908,9 +1919,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         return '<span class="colchip"><input value="' + esc(c) + '" data-fabcol="' + fi + '_' + ci + '" placeholder="colour">' +
           '<button class="chipx" data-fabcoldel="' + fi + '_' + ci + '" title="Remove colour" aria-label="Remove colour">\u00d7</button></span>';
       }).join("");
+      var grpOpts = '<option value="">Price group…</option>' + PRICE_GROUPS.map(function (g) { return '<option ' + (g === f.priceGroup ? "selected" : "") + '>' + esc(g) + '</option>'; }).join("");
       return '<div class="fabblock">' +
         '<div class="fabhd">' +
           '<input class="fabname" value="' + esc(f.name) + '" data-fabname="' + fi + '" placeholder="Fabric name">' +
+          '<select class="grpsel" data-fabgroup="' + fi + '">' + grpOpts + '</select>' +
           '<button class="iconbtn del" data-fabdel="' + fi + '" title="Remove fabric" aria-label="Remove fabric">\u{1F5D1}</button>' +
         '</div>' +
         '<div class="colrow">' + chips +
@@ -1954,7 +1967,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var clean = { fabrics: [], baserails: [] };
     (fabricDraft.fabrics || []).forEach(function (f) {
       var name = (f.name || "").trim(); if (!name) return;
-      clean.fabrics.push({ name: name, colours: (f.colours || []).map(function (c) { return (c || "").trim(); }).filter(Boolean) });
+      clean.fabrics.push({ name: name, priceGroup: (f.priceGroup || "").trim(), colours: (f.colours || []).map(function (c) { return (c || "").trim(); }).filter(Boolean) });
     });
     (fabricDraft.baserails || []).forEach(function (b) {
       var type = (b.type || "").trim(); if (!type) return;
@@ -2330,6 +2343,23 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (r.error) { toast("Could not add client."); return; }
     clients.unshift(r.data); editClientDialog(r.data.id);
   }
+  function clientDiscounts(c) {
+    var d = c && c.fabric_discounts;
+    if (d && typeof d === "object") return d;
+    return {};
+  }
+  function discountGrid(c) {
+    var disc = clientDiscounts(c);
+    var rows = PRICE_GROUPS.map(function (g) {
+      var v = (disc[g] === 0 || disc[g]) ? disc[g] : "";
+      return '<div class="discrow"><span class="disclbl">' + esc(g) + '</span>' +
+        '<span class="discinput"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" ' +
+        'value="' + esc(v) + '" placeholder="0" data-disc="' + esc(g) + '"><span class="pct">%</span></span></div>';
+    }).join("");
+    return '<div class="discwrap"><div class="dischd">Fabric group discounts</div>' +
+      '<p class="hint" style="margin:0 0 10px">The % off this client gets for each fabric group. Leave blank for no discount.</p>' +
+      '<div class="discgrid">' + rows + '</div></div>';
+  }
   function editClientDialog(id) {
     var c = getClient(id); if (!c) return;
     function cf(l, v, k) { return '<label class="fld"><span>' + l + '</span><input value="' + esc(v || "") + '" data-cf="' + k + '"></label>'; }
@@ -2343,7 +2373,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '" placeholder="' + DEFAULT_LEAD_DAYS + ' (default)" data-cf="lead_days"></label>' +
       '</div><p class="hint" style="margin:12px 0 0">Leave the lead time blank to use the standard ' + DEFAULT_LEAD_DAYS +
       ' working days. Changing it updates the expected date on this client\u2019s jobs.</p>' +
-      '<label class="fld wide"><span>Notes</span><textarea rows="2" data-cf="notes">' + esc(c.notes || "") + '</textarea></label>',
+      '<label class="fld wide"><span>Notes</span><textarea rows="2" data-cf="notes">' + esc(c.notes || "") + '</textarea></label>' +
+      discountGrid(c),
       async function () {
         var patch = {};
         modalCollect("[data-cf]").forEach(function (o) {
@@ -2354,6 +2385,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           }
           patch[o.k] = v; c[o.k] = v;
         });
+        var disc = {};
+        [].slice.call(document.querySelectorAll("#modal [data-disc]")).forEach(function (el) {
+          var raw = String(el.value).trim();
+          if (raw === "") return;                 /* blank => no discount, omit */
+          var n = parseFloat(raw);
+          if (isFinite(n) && n > 0) disc[el.getAttribute("data-disc")] = n;
+        });
+        patch.fabric_discounts = disc; c.fabric_discounts = disc;
         markLocalWrite();
         var r = await db.from("clients").update(patch).eq("id", c.id);
         if (r.error) toast("Save failed."); render();
@@ -2630,7 +2669,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "addholiday") addHoliday();
       else if (a === "fabrics-save") saveFabricsDraft();
       else if (a === "fabrics-undo") { fabricDraft = null; render(); }
-      else if (a === "fabric-add") { ensureFabricDraft().fabrics.push({ name: "", colours: [] }); render(); }
+      else if (a === "fabric-add") { ensureFabricDraft().fabrics.push({ name: "", priceGroup: "", colours: [] }); render(); }
       else if (a === "baserail-add") { ensureFabricDraft().baserails.push({ type: "", colours: [] }); render(); }
       else if (a === "price-save") savePrices();
       else if (a === "price-revert") revertPrices();
@@ -2726,6 +2765,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     if (el.hasAttribute("data-fabname")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabname")].name = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-basename")) { ensureFabricDraft().baserails[+el.getAttribute("data-basename")].type = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabcol")) { var fc = el.getAttribute("data-fabcol").split("_"); ensureFabricDraft().fabrics[+fc[0]].colours[+fc[1]] = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-basecol")) { var bc = el.getAttribute("data-basecol").split("_"); ensureFabricDraft().baserails[+bc[0]].colours[+bc[1]] = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-job-field")) {
@@ -2738,6 +2778,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
   document.addEventListener("change", function (e) {
     var el = e.target;
+    if (el.hasAttribute && el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-exp-job")) { setExpectedOverride(el.getAttribute("data-exp-job"), el.value); return; }
     if (el.hasAttribute("data-exp-show")) { return; }
     if (el.hasAttribute("data-status-job")) {
