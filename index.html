@@ -399,7 +399,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .springmark{display:inline-block;color:#8a5a05;font-weight:700;font-size:14px;vertical-align:middle}
 .pricegrid tr.springline td{background:#fffaf0;border-top:1px solid var(--line)}
 .springyes{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#fff2d6;color:#8a5a05}
-@media print{ .p-spring{color:#000;font-weight:700} .p-quote tr.pt-spring td{border-top:1px solid #bbb} }
+.cut th.shade,.cut td.shade{background:#eef3f6}
+.cut tr:hover td.shade{background:#e6edf1}
+@media print{ .p-spring{color:#000;font-weight:700} .p-quote tr.pt-spring td{border-top:1px solid #bbb} .p-grid th.pshade,.p-grid td.pshade{background:#e9eef2 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact} }
 .pricegrid tr.unpriced td{background:#fff8e8;color:#8a5a05}
 .pricegrid .pxnote{font-style:italic}
 .pricegrid .tsub td{border-top:1px solid var(--line);padding-top:8px}
@@ -1661,16 +1663,20 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var rows = ws.map(function (w, i) {
       var cw = clothWidth(w.faceRec, w.width);
       var spring = needsSpringAssist(w) ? '<span class="springyes">Spring Assist</span>' : '<span class="dim">—</span>';
-      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") + '</td><td>' + esc(w.faceRec || "") +
-        '</td><td class="mono strong">' + mm(cw) + '</td><td class="mono">' + mm(clothDrop(w.drop)) +
-        '</td><td class="mono">' + mm(tubeLength(w.faceRec, w.width)) + '</td><td class="mono">' + mm(baserail(w.faceRec, w.width)) +
-        '</td><td>' + esc(fabricSummary(w) || "—") + '</td><td>' + esc(baserailSummary(w) || "—") + '</td><td class="mono">' + esc(w.roll || "—") + '</td><td>' + spring + '</td></tr>';
+      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") +
+        '</td><td class="mono shade">' + mm(tubeLength(w.faceRec, w.width)) +
+        '</td><td>' + esc(fabricSummary(w) || "—") +
+        '</td><td class="mono shade strong">' + mm(cw) +
+        '</td><td class="mono shade">' + mm(clothDrop(w.drop)) +
+        '</td><td>' + esc(baserailSummary(w) || "—") +
+        '</td><td class="mono shade">' + mm(baserail(w.faceRec, w.width)) +
+        '</td><td>' + spring + '</td></tr>';
     }).join("");
-    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th class="shade">Tube length</th><th>Fabric / colour</th><th class="shade">Cloth width</th><th class="shade">Cloth drop</th><th>Baserail type / colour</th><th class="shade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
-      '<div class="ruleline">Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 · Tube = cloth width · Baserail = cloth width + 2 · Spring Assist when ordered width × drop is over ' + SPRING_ASSIST_AREA + ' m²</div>';
+      '<div class="ruleline">Cloth width: Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 · Tube = cloth width · Baserail = cloth width + 2 · Spring Assist when ordered width × drop is over ' + SPRING_ASSIST_AREA + ' m²</div>';
   }
   function labelsTab(job) {
     var ws = activeWindows(job);
@@ -2533,14 +2539,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var client = getClient(job.clientId), ws = activeWindows(job);
     var rows = ws.map(function (w, i) {
       var spring = needsSpringAssist(w) ? "Spring Assist" : "";
-      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") + '</td><td>' + esc(w.faceRec || "") +
-        '</td><td>' + mm(clothWidth(w.faceRec, w.width)) + '</td><td>' + mm(clothDrop(w.drop)) +
-        '</td><td>' + mm(tubeLength(w.faceRec, w.width)) + '</td><td>' + mm(baserail(w.faceRec, w.width)) +
-        '</td><td>' + esc(fabricSummary(w) || "") + '</td><td>' + esc(baserailSummary(w) || "") + '</td><td>' + esc(w.roll || "") + '</td><td class="p-spring">' + spring + '</td></tr>';
+      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") +
+        '</td><td class="pshade">' + mm(tubeLength(w.faceRec, w.width)) +
+        '</td><td>' + esc(fabricSummary(w) || "") +
+        '</td><td class="pshade">' + mm(clothWidth(w.faceRec, w.width)) +
+        '</td><td class="pshade">' + mm(clothDrop(w.drop)) +
+        '</td><td>' + esc(baserailSummary(w) || "") +
+        '</td><td class="pshade">' + mm(baserail(w.faceRec, w.width)) +
+        '</td><td class="p-spring">' + spring + '</td></tr>';
     }).join("");
     doPrint('<div class="p-cut"><div class="p-head"><h2>Cloth Cut List</h2><div class="p-meta"><div><b>' + esc(job.jobName || "") + '</b></div><div>' +
       esc(client ? client.name : "") + ' · ' + esc(job.sanRef || "") + ' · ' + esc(job.clientRef || "") + '</div><div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
-      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th class="pshade">Tube length</th><th>Fabric / colour</th><th class="pshade">Cloth width</th><th class="pshade">Cloth drop</th><th>Baserail type / colour</th><th class="pshade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
   }
   function printLabels(job) {
     var ws = activeWindows(job), cells = [];
