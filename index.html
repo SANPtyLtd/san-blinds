@@ -396,8 +396,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .pricegrid .ralign{text-align:right}
 .pricegrid .pgtag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px}
 .springnote{font-size:11.5px;color:#8a5a05;margin-top:3px;font-weight:600}
+.springmark{display:inline-block;color:#8a5a05;font-weight:700;font-size:14px;vertical-align:middle}
+.pricegrid tr.springline td{background:#fffaf0;border-top:1px solid var(--line)}
 .springyes{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#fff2d6;color:#8a5a05}
-@media print{ .p-spring{color:#000;font-weight:700} }
+@media print{ .p-spring{color:#000;font-weight:700} .p-quote tr.pt-spring td{border-top:1px solid #bbb} }
 .pricegrid tr.unpriced td{background:#fff8e8;color:#8a5a05}
 .pricegrid .pxnote{font-style:italic}
 .pricegrid .tsub td{border-top:1px solid var(--line);padding-top:8px}
@@ -751,13 +753,20 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var pr = jobWindowPrice(P, client, w);
       return { w: w, pr: pr };
     });
-    var netTotal = 0, anyPriced = false, anyUnpriced = false;
+    var blindNetTotal = 0, springCount = 0, springTotal = 0, springEach = 0;
+    var anyPriced = false, anyUnpriced = false;
     lines.forEach(function (L) {
-      if (L.pr.priced) { netTotal += L.pr.net; anyPriced = true; }
-      else anyUnpriced = true;
+      if (L.pr.priced) {
+        blindNetTotal += L.pr.blindNet;
+        if (L.pr.spring) { springCount += 1; springTotal += L.pr.spring; springEach = L.pr.spring; }
+        anyPriced = true;
+      } else anyUnpriced = true;
     });
+    var netTotal = blindNetTotal + springTotal;   /* ex-GST subtotal incl. spring assists */
     var gst = netTotal * gstRate;
-    return { lines: lines, client: client, netTotal: netTotal, gstRate: gstRate, gst: gst,
+    return { lines: lines, client: client,
+             blindNetTotal: blindNetTotal, springCount: springCount, springEach: springEach, springTotal: springTotal,
+             netTotal: netTotal, gstRate: gstRate, gst: gst,
              total: netTotal + gst, anyPriced: anyPriced, anyUnpriced: anyUnpriced };
   }
   function groupOf(P, key) {
@@ -1564,17 +1573,29 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           '<td>' + esc(fabricSummary(w) || "—") + '</td><td class="mono">' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
           '<td colspan="4" class="pxnote">' + esc(p.reason) + '</td></tr>';
       }
-      var lineGst = p.net * pr.gstRate;
-      var springNote = p.spring ? '<div class="springnote">+ Spring Assist ' + money(p.spring) + ' (oversize)</div>' : "";
-      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td>' +
-        '<td>' + esc(fabricSummary(w) || "—") + ' <span class="pgtag">' + esc(p.group) + '</span>' + springNote + '</td>' +
+      var lineGst = p.blindNet * pr.gstRate;
+      var springMark = p.spring ? ' <span class="springmark" title="Oversize — Spring Assist required (see below)">\u2295</span>' : "";
+      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + '</td>' +
+        '<td>' + esc(fabricSummary(w) || "—") + ' <span class="pgtag">' + esc(p.group) + '</span></td>' +
         '<td class="mono">' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="mono ralign">' + money(p.base) + '</td>' +
         '<td class="mono ralign">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
-        '<td class="mono ralign">' + money(p.net) + '</td>' +
+        '<td class="mono ralign">' + money(p.blindNet) + '</td>' +
         '<td class="mono ralign">' + money(lineGst) + '</td>' +
-        '<td class="mono ralign strong">' + money(p.net + lineGst) + '</td></tr>';
+        '<td class="mono ralign strong">' + money(p.blindNet + lineGst) + '</td></tr>';
     }).join("");
+
+    var springRow = "";
+    if (pr.springCount) {
+      var springGst = pr.springTotal * pr.gstRate;
+      springRow =
+        '<tr class="springline"><td></td><td colspan="3"><span class="springmark">\u2295</span> Spring Assist <span class="dim">(oversize blinds)</span></td>' +
+        '<td class="mono ralign">' + money(pr.springEach) + '</td>' +
+        '<td class="mono ralign">× ' + pr.springCount + '</td>' +
+        '<td class="mono ralign">' + money(pr.springTotal) + '</td>' +
+        '<td class="mono ralign">' + money(springGst) + '</td>' +
+        '<td class="mono ralign strong">' + money(pr.springTotal + springGst) + '</td></tr>';
+    }
 
     var totals =
       '<tr class="tsub"><td colspan="6" class="ralign">Subtotal (excl GST)</td><td class="mono ralign strong">' + money(pr.netTotal) + '</td><td class="mono ralign">' + money(pr.gst) + '</td><td class="mono ralign">' + money(pr.total) + '</td></tr>' +
@@ -1589,7 +1610,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       warn +
       '<div class="tablescroll"><table class="grid pricegrid"><thead><tr><th>#</th><th>Window</th><th>Fabric</th><th>Size (mm)</th>' +
       '<th class="ralign">Base</th><th class="ralign">Disc</th><th class="ralign">Net</th><th class="ralign">GST</th><th class="ralign">Inc GST</th></tr></thead>' +
-      '<tbody>' + rows + totals + '</tbody></table></div></div>' +
+      '<tbody>' + rows + springRow + totals + '</tbody></table></div></div>' +
       noDisc +
       '<div class="ruleline">Each window: base price (from its fabric\u2019s group grid at the next size band up) − this client\u2019s discount for that group. GST added on the subtotal.</div>';
   }
@@ -1602,15 +1623,23 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td><td>' + esc(fabricSummary(w) || "") +
           '</td><td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td><td colspan="5">' + esc(p.reason) + '</td></tr>';
       }
-      var lineGst = p.net * pr.gstRate;
-      var springNote = p.spring ? '<br><span class="p-spring">+ Spring Assist ' + money(p.spring) + ' (oversize)</span>' : "";
-      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td>' +
-        '<td>' + esc(fabricSummary(w)) + ' (' + esc(p.group) + ')' + springNote + '</td>' +
+      var lineGst = p.blindNet * pr.gstRate;
+      var springMark = p.spring ? ' \u2295' : "";
+      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + '</td>' +
+        '<td>' + esc(fabricSummary(w)) + ' (' + esc(p.group) + ')</td>' +
         '<td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="ra">' + money(p.base) + '</td><td class="ra">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
-        '<td class="ra">' + money(p.net) + '</td><td class="ra">' + money(lineGst) + '</td>' +
-        '<td class="ra">' + money(p.net + lineGst) + '</td></tr>';
+        '<td class="ra">' + money(p.blindNet) + '</td><td class="ra">' + money(lineGst) + '</td>' +
+        '<td class="ra">' + money(p.blindNet + lineGst) + '</td></tr>';
     }).join("");
+    var springRow = "";
+    if (pr.springCount) {
+      var springGst = pr.springTotal * pr.gstRate;
+      springRow = '<tr class="pt-spring"><td></td><td colspan="3">\u2295 Spring Assist (oversize blinds)</td>' +
+        '<td class="ra">' + money(pr.springEach) + '</td><td class="ra">× ' + pr.springCount + '</td>' +
+        '<td class="ra">' + money(pr.springTotal) + '</td><td class="ra">' + money(springGst) + '</td>' +
+        '<td class="ra">' + money(pr.springTotal + springGst) + '</td></tr>';
+    }
     var totals =
       '<tr class="pt-sub"><td colspan="6" class="ra">Subtotal (excl GST)</td><td class="ra">' + money(pr.netTotal) + '</td><td class="ra">' + money(pr.gst) + '</td><td class="ra">' + money(pr.total) + '</td></tr>' +
       '<tr class="pt-tot"><td colspan="6" class="ra">Total (incl GST)</td><td colspan="2"></td><td class="ra">' + money(pr.total) + '</td></tr>';
@@ -1623,7 +1652,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
       '<table class="p-grid qgrid"><thead><tr><th>#</th><th>Window</th><th>Fabric</th><th>Size</th>' +
       '<th class="ra">Base</th><th class="ra">Disc</th><th class="ra">Net</th><th class="ra">GST</th><th class="ra">Inc GST</th></tr></thead>' +
-      '<tbody>' + rows + totals + '</tbody></table>' +
+      '<tbody>' + rows + springRow + totals + '</tbody></table>' +
       (pr.anyUnpriced ? '<p class="p-foot">Windows shown without a price need pricing by hand and are not included in the total.</p>' : "") +
       '<p class="p-foot">' + esc(companyLine()) + '</p></div>');
   }
