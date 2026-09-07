@@ -395,6 +395,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 }
 .pricegrid .ralign{text-align:right}
 .pricegrid .pgtag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px}
+.springnote{font-size:11.5px;color:#8a5a05;margin-top:3px;font-weight:600}
+.springyes{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#fff2d6;color:#8a5a05}
+@media print{ .p-spring{color:#000;font-weight:700} }
 .pricegrid tr.unpriced td{background:#fff8e8;color:#8a5a05}
 .pricegrid .pxnote{font-style:italic}
 .pricegrid .tsub td{border-top:1px solid var(--line);padding-top:8px}
@@ -592,6 +595,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
   /* Charges — edit here if any of these change */
   var INSTALL_PER_BLIND = 50;
+  var SPRING_ASSIST_PRICE = 36.5;              /* $ per oversize blind, ex GST */
+  var SPRING_ASSIST_AREA = 4.5;                /* m² — an ordered blind OVER this needs a spring assist */
+  /* Is this window over the spring-assist size? Uses ORDERED width x drop. */
+  function needsSpringAssist(w) {
+    var wd = Number(w.width), dp = Number(w.drop);
+    if (!isFinite(wd) || !isFinite(dp) || wd <= 0 || dp <= 0) return false;
+    return (wd * dp) / 1000000 > SPRING_ASSIST_AREA;   /* mm² -> m² */
+  }
   var ADDONS = [
     { key: "motor",   label: "Motorisation",  short: "Motor",    price: 10 },
     { key: "highFit", label: "High fit",      short: "High fit", price: 10 },
@@ -645,7 +656,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       return { key: k, label: t.label, widths: t.widths.slice(), drops: t.drops.slice(), rows: rows };
     });
     return {
-      install: INSTALL_PER_BLIND, gstRate: GST_RATE,
+      install: INSTALL_PER_BLIND, gstRate: GST_RATE, springAssist: SPRING_ASSIST_PRICE,
       addons: ADDONS.map(function (a) { return { key: a.key, label: a.label, short: a.short, price: a.price }; }),
       motors: MOTOR_ITEMS.map(function (m) { return { key: m.key, label: m.label, price: m.price }; }),
       fabrics: CURTAIN_FABRICS.map(function (f) { return { key: f.key, label: f.label, rate: f.rate }; }),
@@ -657,6 +668,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (!d || !Array.isArray(d.groups) || !d.groups.length) return builtInPricing();
     return {
       install: isFinite(Number(d.install)) ? Number(d.install) : 0,
+      springAssist: isFinite(Number(d.springAssist)) ? Number(d.springAssist) : 36.5,
       gstRate: isFinite(Number(d.gstRate)) ? Number(d.gstRate) : 0.10,
       addons: Array.isArray(d.addons) ? d.addons : [],
       motors: Array.isArray(d.motors) ? d.motors : MOTOR_ITEMS.slice(),
@@ -721,8 +733,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var pct = clientDiscountPct(client, fg);
     var base = r.price;
     var discAmt = base * pct / 100;
-    var net = base - discAmt;
-    return { priced: true, group: fg, base: base, pct: pct, discount: discAmt, net: net, wBand: r.wBand, dBand: r.dBand };
+    var blindNet = base - discAmt;
+    /* Spring assist: a flat, un-discounted add-on for oversize blinds. */
+    var spring = needsSpringAssist(w) ? (isFinite(P.springAssist) ? P.springAssist : SPRING_ASSIST_PRICE) : 0;
+    var net = blindNet + spring;
+    return { priced: true, group: fg, base: base, pct: pct, discount: discAmt,
+             blindNet: blindNet, spring: spring, net: net, wBand: r.wBand, dBand: r.dBand };
   }
   /* Whole-job pricing: sum the net lines, then add GST at the end. */
   function jobPricing(job) {
@@ -1549,8 +1565,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           '<td colspan="4" class="pxnote">' + esc(p.reason) + '</td></tr>';
       }
       var lineGst = p.net * pr.gstRate;
+      var springNote = p.spring ? '<div class="springnote">+ Spring Assist ' + money(p.spring) + ' (oversize)</div>' : "";
       return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td>' +
-        '<td>' + esc(fabricSummary(w) || "—") + ' <span class="pgtag">' + esc(p.group) + '</span></td>' +
+        '<td>' + esc(fabricSummary(w) || "—") + ' <span class="pgtag">' + esc(p.group) + '</span>' + springNote + '</td>' +
         '<td class="mono">' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="mono ralign">' + money(p.base) + '</td>' +
         '<td class="mono ralign">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
@@ -1586,8 +1603,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           '</td><td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td><td colspan="5">' + esc(p.reason) + '</td></tr>';
       }
       var lineGst = p.net * pr.gstRate;
+      var springNote = p.spring ? '<br><span class="p-spring">+ Spring Assist ' + money(p.spring) + ' (oversize)</span>' : "";
       return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + '</td>' +
-        '<td>' + esc(fabricSummary(w)) + ' (' + esc(p.group) + ')</td>' +
+        '<td>' + esc(fabricSummary(w)) + ' (' + esc(p.group) + ')' + springNote + '</td>' +
         '<td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="ra">' + money(p.base) + '</td><td class="ra">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
         '<td class="ra">' + money(p.net) + '</td><td class="ra">' + money(lineGst) + '</td>' +
@@ -1613,16 +1631,17 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var ws = activeWindows(job);
     var rows = ws.map(function (w, i) {
       var cw = clothWidth(w.faceRec, w.width);
+      var spring = needsSpringAssist(w) ? '<span class="springyes">Spring Assist</span>' : '<span class="dim">—</span>';
       return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") + '</td><td>' + esc(w.faceRec || "") +
         '</td><td class="mono strong">' + mm(cw) + '</td><td class="mono">' + mm(clothDrop(w.drop)) +
         '</td><td class="mono">' + mm(tubeLength(w.faceRec, w.width)) + '</td><td class="mono">' + mm(baserail(w.faceRec, w.width)) +
-        '</td><td>' + esc(fabricSummary(w) || "—") + '</td><td>' + esc(baserailSummary(w) || "—") + '</td><td class="mono">' + esc(w.roll || "—") + '</td></tr>';
+        '</td><td>' + esc(fabricSummary(w) || "—") + '</td><td>' + esc(baserailSummary(w) || "—") + '</td><td class="mono">' + esc(w.roll || "—") + '</td><td>' + spring + '</td></tr>';
     }).join("");
-    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
-      '<div class="ruleline">Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 · Tube = cloth width · Baserail = cloth width + 2</div>';
+      '<div class="ruleline">Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 · Tube = cloth width · Baserail = cloth width + 2 · Spring Assist when ordered width × drop is over ' + SPRING_ASSIST_AREA + ' m²</div>';
   }
   function labelsTab(job) {
     var ws = activeWindows(job);
@@ -2484,14 +2503,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function printCloth(job) {
     var client = getClient(job.clientId), ws = activeWindows(job);
     var rows = ws.map(function (w, i) {
+      var spring = needsSpringAssist(w) ? "Spring Assist" : "";
       return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") + '</td><td>' + esc(w.faceRec || "") +
         '</td><td>' + mm(clothWidth(w.faceRec, w.width)) + '</td><td>' + mm(clothDrop(w.drop)) +
         '</td><td>' + mm(tubeLength(w.faceRec, w.width)) + '</td><td>' + mm(baserail(w.faceRec, w.width)) +
-        '</td><td>' + esc(fabricSummary(w) || "") + '</td><td>' + esc(baserailSummary(w) || "") + '</td><td>' + esc(w.roll || "") + '</td></tr>';
+        '</td><td>' + esc(fabricSummary(w) || "") + '</td><td>' + esc(baserailSummary(w) || "") + '</td><td>' + esc(w.roll || "") + '</td><td class="p-spring">' + spring + '</td></tr>';
     }).join("");
     doPrint('<div class="p-cut"><div class="p-head"><h2>Cloth Cut List</h2><div class="p-meta"><div><b>' + esc(job.jobName || "") + '</b></div><div>' +
       esc(client ? client.name : "") + ' · ' + esc(job.sanRef || "") + ' · ' + esc(job.clientRef || "") + '</div><div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
-      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Type</th><th>Cloth width</th><th>Cloth drop</th><th>Tube length</th><th>Baserail (mm)</th><th>Fabric / colour</th><th>Baserail type / colour</th><th>Roll</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
   }
   function printLabels(job) {
     var ws = activeWindows(job), cells = [];
