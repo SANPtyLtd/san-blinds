@@ -170,11 +170,11 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
 /* modal */
 .modal{position:fixed;inset:0;background:rgba(16,28,42,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
 .modal.open{display:flex}
-.m-card{background:#fff;border-radius:16px;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
-.m-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.m-card{background:#fff;border-radius:16px;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 40px)}
+.m-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex:none}
 .m-title{font-weight:700;font-size:17px;color:var(--ink)}
-.m-body{padding:22px}
-.m-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.m-body{padding:22px;overflow-y:auto;flex:1 1 auto;-webkit-overflow-scrolling:touch}
+.m-foot{padding:16px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;flex:none}
 .m-close{background:none;border:0;font-size:22px;color:var(--dim);cursor:pointer;line-height:1}
 
 /* toast */
@@ -399,6 +399,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .spectag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:#e5dcf7;color:#5b3ba8;margin-left:3px}
 .pricegrid tr.aohdr td{background:#f5f8fa;padding-top:9px;font-size:13px}
 .addonspanel{margin-top:14px}
+.ao-section{margin-top:6px;padding-top:10px;border-top:1px solid var(--line)}
+.ao-section:first-of-type{border-top:0}
+.ao-sechd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.ao-sechd span{font-weight:700;font-size:13.5px}
 .ao-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
 .ao-row .ao-name{font-weight:600;min-width:180px}
 .ao-item{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px;min-width:220px}
@@ -406,6 +410,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .ao-qty input{width:64px;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit;font-size:14px;text-align:right}
 .ao-target select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px}
 .discrow.special.on{background:#f6f2fe;border-radius:8px}
+.specinput{display:inline-flex;align-items:center;gap:0}
+.spectoggle{width:30px;height:34px;border:1px solid var(--line);border-right:0;border-radius:8px 0 0 8px;background:#f3f5f7;cursor:pointer;font-weight:700;font-size:14px;color:#516072}
+.spectoggle:hover{background:#e8ecef;color:var(--teal)}
+.specinput input{border-radius:0 8px 8px 0}
 .discgrid.special{grid-template-columns:1fr}
 .springnote{font-size:11.5px;color:#8a5a05;margin-top:3px;font-weight:600}
 .springmark{display:inline-block;color:#8a5a05;font-weight:700;font-size:14px;vertical-align:middle}
@@ -740,15 +748,23 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var v = d[fabricGroup];
     return (typeof v === "number" && isFinite(v) && v > 0) ? v : 0;
   }
-  /* Which discount % applies to a hardware item for this client:
-     special-agreement on that item wins; otherwise the item's category %. */
-  function hardwareDiscountPct(client, item) {
-    if (!client || !item) return 0;
-    var sp = client.special_discounts;
-    if (sp && typeof sp === "object") {
-      var s = sp[item.id];
-      if (typeof s === "number" && isFinite(s) && s > 0) return s;
+  /* Resolve the special-agreement entry for an item -> {type:"pct"|"dollar", value} or null.
+     Handles legacy bare-number entries (treated as a percent). */
+  function specialFor(client, itemId) {
+    var sp = client && client.special_discounts;
+    if (!sp || typeof sp !== "object") return null;
+    var raw = sp[itemId];
+    if (raw == null || raw === "") return null;
+    if (typeof raw === "number") return isFinite(raw) && raw > 0 ? { type: "pct", value: raw } : null;
+    if (typeof raw === "object" && (raw.type === "pct" || raw.type === "dollar")) {
+      var v = Number(raw.value);
+      if (!isFinite(v) || v < 0) return null;
+      if (raw.type === "pct" && v <= 0) return null;
+      return { type: raw.type, value: v };
     }
+    return null;
+  }
+  function categoryPct(client, item) {
     var catVal = item.cat === "Motorisation" ? client.motor_discount : client.hardware_discount;
     return (typeof catVal === "number" && isFinite(catVal) && catVal > 0) ? catVal : 0;
   }
@@ -758,11 +774,19 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var item = hardwareItem(a.id);
       var qty = Math.max(1, parseInt(a.qty, 10) || 1);
       if (!item) return { name: "(removed item)", qty: qty, priced: false };
-      var pct = hardwareDiscountPct(client, item);
-      var unit = item.price;
-      var net = unit * qty * (1 - pct / 100);
+      var sp = specialFor(client, item.id);
+      var unit, pct = 0, net, isSpecialDollar = false;
+      if (sp && sp.type === "dollar") {
+        /* client pays this fixed price per unit — no further discount */
+        unit = sp.value; net = unit * qty; isSpecialDollar = true;
+      } else if (sp && sp.type === "pct") {
+        pct = sp.value; unit = item.price; net = unit * qty * (1 - pct / 100);
+      } else {
+        pct = categoryPct(client, item); unit = item.price; net = unit * qty * (1 - pct / 100);
+      }
       return { id: item.id, name: item.name, cat: item.cat, qty: qty, unit: unit, pct: pct,
-               net: net, priced: true, special: !!(client && client.special_discounts && client.special_discounts[item.id]) };
+               net: net, priced: true, special: !!sp, specialDollar: isSpecialDollar,
+               listPrice: item.price };
     });
   }
   /* Price one window of a production job:
@@ -1664,9 +1688,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function addonsPanel(job) {
     var items = hardwareSettings.items;
     var list = jobAddons(job);
-    var itemOpts = '<option value="">Choose item…</option>' + items.slice().sort(function (a, b) {
-      return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
-    }).map(function (h) { return '<option value="' + esc(h.id) + '">' + esc(h.name) + ' — ' + esc(h.cat) + '</option>'; }).join("");
+    if (!items.length) {
+      return '<div class="card pad addonspanel"><div class="cardbar"><div><b>Add-ons</b></div></div>' +
+        '<p class="dim">No hardware items yet. Add them on the <b>Hardware</b> tab first.</p></div>';
+    }
     function targetOpts(sel) {
       var o = '<option value="job"' + (sel === "job" ? " selected" : "") + '>Whole job</option>';
       o += job.windows.map(function (w, i) {
@@ -1675,22 +1700,40 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       }).join("");
       return o;
     }
-    var rows = list.map(function (a, i) {
+    /* which category does a given add-on row belong to?
+       - if it has a chosen item, use that item's category
+       - otherwise use the category it was created under (a.cat) */
+    function rowCat(a) {
       var item = hardwareItem(a.id);
-      var nameCell = item
-        ? '<span class="ao-name">' + esc(item.name) + ' <span class="hwcattag">' + esc(item.cat) + '</span></span>'
-        : '<select class="ao-item" data-ao-item="' + i + '">' + itemOpts.replace('value="' + esc(a.id) + '"', 'value="' + esc(a.id) + '" selected') + '</select>';
-      return '<div class="ao-row">' +
-        (item ? nameCell : nameCell) +
-        '<span class="ao-qty">Qty <input type="number" inputmode="numeric" min="1" value="' + esc(a.qty || 1) + '" data-ao-qty="' + i + '"></span>' +
-        '<span class="ao-target">Applies to <select data-ao-target="' + i + '">' + targetOpts(a.target || "job") + '</select></span>' +
-        '<button class="iconbtn del" data-ao-del="' + i + '" title="Remove add-on" aria-label="Remove add-on">\u{1F5D1}</button>' +
-        '</div>';
-    }).join("");
-    return '<div class="card pad addonspanel"><div class="cardbar"><div><b>Add-ons</b> <span class="dim">— motorisation &amp; hardware for this job</span></div>' +
-      (items.length ? '<button class="btn small" data-action="addon-add">+ Add item</button>' : '') + '</div>' +
-      (!items.length ? '<p class="dim">No hardware items yet. Add them on the <b>Hardware</b> tab first.</p>'
-        : (list.length ? rows : '<p class="dim">No add-ons on this job. Use “+ Add item” to add motorisation, brackets, etc.</p>')) +
+      return item ? item.cat : (a.cat || "Blind hardware");
+    }
+    function itemOptsFor(cat, selId) {
+      return '<option value="">Choose item…</option>' + items.filter(function (h) { return h.cat === cat; })
+        .slice().sort(function (a, b) { return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase()); })
+        .map(function (h) { return '<option value="' + esc(h.id) + '"' + (h.id === selId ? " selected" : "") + '>' + esc(h.name) + '</option>'; }).join("");
+    }
+    function sectionRows(cat) {
+      /* keep each row's real index in the job's addons array for editing */
+      var idxs = list.map(function (a, i) { return i; }).filter(function (i) { return rowCat(list[i]) === cat; });
+      if (!idxs.length) return '<p class="dim">None added.</p>';
+      return idxs.map(function (i) {
+        var a = list[i], item = hardwareItem(a.id);
+        var nameCell = item
+          ? '<span class="ao-name">' + esc(item.name) + '</span>'
+          : '<select class="ao-item" data-ao-item="' + i + '">' + itemOptsFor(cat, a.id) + '</select>';
+        return '<div class="ao-row">' + nameCell +
+          '<span class="ao-qty">Qty <input type="number" inputmode="numeric" min="1" value="' + esc(a.qty || 1) + '" data-ao-qty="' + i + '"></span>' +
+          '<span class="ao-target">Applies to <select data-ao-target="' + i + '">' + targetOpts(a.target || "job") + '</select></span>' +
+          '<button class="iconbtn del" data-ao-del="' + i + '" title="Remove add-on" aria-label="Remove add-on">\u{1F5D1}</button>' +
+          '</div>';
+      }).join("");
+    }
+    return '<div class="card pad addonspanel"><div class="cardbar"><div><b>Add-ons</b> <span class="dim">— motorisation &amp; hardware for this job</span></div></div>' +
+      HARDWARE_CATEGORIES.map(function (cat) {
+        return '<div class="ao-section"><div class="ao-sechd"><span>' + esc(cat) + '</span>' +
+          '<button class="btn small" data-action="addon-add" data-cat="' + esc(cat) + '">+ Add ' + esc(cat.toLowerCase()) + '</button></div>' +
+          sectionRows(cat) + '</div>';
+      }).join("") +
       '</div>';
   }
   function fabricSummary(w) {
@@ -1748,10 +1791,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           return '<tr class="unpriced"><td></td><td colspan="3">' + esc(a.name) + '</td><td colspan="5" class="pxnote">Item no longer in the hardware list</td></tr>';
         }
         var g = a.net * pr.gstRate;
-        var discLbl = a.pct ? (a.pct + "%" + (a.special ? ' <span class="spectag">special</span>' : "")) : "—";
+        var discLbl = a.specialDollar
+          ? '<span class="spectag">set price</span>'
+          : (a.pct ? (a.pct + "%" + (a.special ? ' <span class="spectag">special</span>' : "")) : "—");
+        var unitLbl = a.specialDollar ? money(a.unit) : money(a.unit);
         return '<tr><td></td><td>' + esc(a.name) + ' <span class="hwcattag">' + esc(a.cat) + '</span></td>' +
           '<td class="dim">' + esc(a.appliesTo) + '</td>' +
-          '<td class="mono ralign">' + money(a.unit) + '</td>' +
+          '<td class="mono ralign">' + unitLbl + '</td>' +
           '<td class="mono ralign">× ' + a.qty + '</td>' +
           '<td class="mono ralign">' + discLbl + '</td>' +
           '<td class="mono ralign">' + money(a.net) + '</td>' +
@@ -1809,9 +1855,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       addonRows += pr.addonLines.map(function (a) {
         if (!a.priced) return '<tr><td></td><td colspan="3">' + esc(a.name) + '</td><td colspan="5">(removed)</td></tr>';
         var g = a.net * pr.gstRate;
+        var dlbl = a.specialDollar ? "set price" : (a.pct ? a.pct + "%" : "—");
         return '<tr><td></td><td>' + esc(a.name) + ' (' + esc(a.cat) + ')</td><td>' + esc(a.appliesTo) + '</td>' +
           '<td class="ra">' + money(a.unit) + '</td><td class="ra">× ' + a.qty + '</td>' +
-          '<td class="ra">' + (a.pct ? a.pct + "%" : "—") + '</td>' +
+          '<td class="ra">' + dlbl + '</td>' +
           '<td class="ra">' + money(a.net) + '</td><td class="ra">' + money(g) + '</td>' +
           '<td class="ra">' + money(a.net + g) + '</td></tr>';
       }).join("");
@@ -2875,15 +2922,27 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
                   catInput("Blind hardware", "Blind hardware", c.hardware_discount);
     /* special-agreement: a % against individually-chosen hardware items */
     var special = clientSpecial(c);
+    function specialVal(id) {
+      /* normalise legacy (bare number = percent) into {type, value} */
+      var raw = special[id];
+      if (raw == null || raw === "") return null;
+      if (typeof raw === "number") return { type: "pct", value: raw };
+      if (typeof raw === "object" && (raw.type === "pct" || raw.type === "dollar")) return { type: raw.type, value: raw.value };
+      return null;
+    }
     var specialRows = hardwareSettings.items.slice().sort(function (a, b) {
       return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
     }).map(function (h) {
-      var v = (special[h.id] === 0 || special[h.id]) ? special[h.id] : "";
-      var on = v !== "";
+      var sv = specialVal(h.id);
+      var on = !!sv;
+      var type = sv ? sv.type : "pct";
+      var v = sv ? sv.value : "";
       return '<div class="discrow special' + (on ? " on" : "") + '"><span class="disclbl">' + esc(h.name) +
         ' <span class="hwcattag">' + esc(h.cat) + '</span></span>' +
-        '<span class="discinput"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" ' +
-        'value="' + esc(v) + '" placeholder="—" data-special="' + esc(h.id) + '"><span class="pct">%</span></span></div>';
+        '<span class="discinput specinput">' +
+        '<button type="button" class="spectoggle" data-spectoggle="' + esc(h.id) + '" data-type="' + type + '" title="Switch between % discount and $ price">' + (type === "dollar" ? "$" : "%") + '</button>' +
+        '<input type="number" inputmode="decimal" min="0" step="0.5" ' +
+        'value="' + esc(v) + '" placeholder="' + (type === "dollar" ? "$ price" : "% off") + '" data-special="' + esc(h.id) + '" data-spectype="' + type + '"></span></div>';
     }).join("");
     return '<div class="discwrap"><div class="dischd">Fabric group discounts</div>' +
       '<p class="hint" style="margin:0 0 10px">The % off this client gets for each fabric group. Leave blank for no discount.</p>' +
@@ -2893,7 +2952,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div class="discgrid">' + catRows + '</div>' +
       (hardwareSettings.items.length ?
         '<div class="dischd" style="margin-top:16px">Special agreement <span class="dim" style="font-weight:400">(overrides the category % for these items)</span></div>' +
-        '<p class="hint" style="margin:0 0 10px">Set a % against individual items for a special deal. Leave blank to just use the category discount above.</p>' +
+        '<p class="hint" style="margin:0 0 10px">Per item, set a special deal: tap the <b>%</b>/<b>$</b> button to switch between a % discount and a fixed $ price the client pays. Leave blank to just use the category discount above.</p>' +
         '<div class="discgrid special">' + specialRows + '</div>'
       : "") +
       '</div>';
@@ -2940,13 +2999,16 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         }
         patch.motor_discount = catVal("Motorisation"); c.motor_discount = patch.motor_discount;
         patch.hardware_discount = catVal("Blind hardware"); c.hardware_discount = patch.hardware_discount;
-        /* special-agreement per-item discounts */
+        /* special-agreement per-item: % discount or $ fixed price */
         var special = {};
         [].slice.call(document.querySelectorAll("#modal [data-special]")).forEach(function (el) {
           var raw = String(el.value).trim();
           if (raw === "") return;
           var n = parseFloat(raw);
-          if (isFinite(n) && n > 0) special[el.getAttribute("data-special")] = n;
+          if (!isFinite(n) || n < 0) return;
+          var type = el.getAttribute("data-spectype") === "dollar" ? "dollar" : "pct";
+          if (type === "pct" && n <= 0) return;    /* 0% is meaningless; $0 is a valid free item */
+          special[el.getAttribute("data-special")] = { type: type, value: n };
         });
         patch.special_discounts = special; c.special_discounts = special;
         markLocalWrite();
@@ -3132,7 +3194,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   /* ---------- events ---------- */
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
-      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday],[data-ao-del]," +
+      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday],[data-ao-del],[data-spectoggle]," +
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
@@ -3220,6 +3282,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       jobD.addons = jobAddons(jobD).filter(function (a, i) { return i !== +t.getAttribute("data-ao-del"); });
       saveAddons(jobD); render();
     }
+    else if (t.hasAttribute("data-spectoggle")) {
+      /* flip a special-agreement row between % discount and $ price, in place */
+      var newType = t.getAttribute("data-type") === "dollar" ? "pct" : "dollar";
+      t.setAttribute("data-type", newType);
+      t.textContent = newType === "dollar" ? "$" : "%";
+      var inp = document.querySelector('#modal [data-special="' + t.getAttribute("data-spectoggle") + '"]');
+      if (inp) { inp.setAttribute("data-spectype", newType); inp.setAttribute("placeholder", newType === "dollar" ? "$ price" : "% off"); }
+    }
     else if (t.classList.contains("m-close")) closeModal();
     else if (t.hasAttribute("data-msave")) { if (modalSave) modalSave(); closeModal(); }
     else if (t.hasAttribute("data-action")) {
@@ -3227,7 +3297,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (a === "newjob") newJob();
       else if (a === "newclient") newClient();
       else if (a === "addwin") { var jb = getJob(state.jobId); if (jb.windows.length < MAX_WINDOWS) { jb.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "" }); saveWindows(jb); render(); } }
-      else if (a === "addon-add") { var ja = getJob(state.jobId); if (!Array.isArray(ja.addons)) ja.addons = []; ja.addons.push({ id: "", qty: 1, target: "job" }); saveAddons(ja); render(); }
+      else if (a === "addon-add") { var ja = getJob(state.jobId); if (!Array.isArray(ja.addons)) ja.addons = []; ja.addons.push({ id: "", qty: 1, target: "job", cat: t.getAttribute("data-cat") || "Blind hardware" }); saveAddons(ja); render(); }
       else if (a === "clientview") { state.clientView = t.checked; render(); }
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
