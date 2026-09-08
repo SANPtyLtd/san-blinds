@@ -456,7 +456,23 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .btn.ghost{background:transparent;border:1px dashed var(--line);color:var(--dim)}
 .btn.ghost:hover{border-color:var(--teal);color:var(--teal)}
 .savedtag{color:#1d7a45;font-weight:600;font-size:13px;padding:8px 4px}
-.hwhead{display:grid;grid-template-columns:1fr 120px 180px 44px;gap:10px;padding:0 2px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:700}
+.navlink.help{margin-left:auto}
+.help-searchwrap{margin:0 0 16px}
+.help-search{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:13px 16px;font-family:inherit;font-size:15px;background:#fff}
+.help-search:focus{outline:2px solid var(--teal);border-color:var(--teal)}
+.help-list{display:flex;flex-direction:column;gap:10px}
+.help-sec{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.help-sechd{width:100%;display:flex;align-items:center;gap:12px;padding:16px 18px;background:none;border:0;cursor:pointer;font-family:inherit;text-align:left}
+.help-sechd:hover{background:#fafcfd}
+.help-icon{font-size:20px;flex:none}
+.help-title{font-weight:700;font-size:16px;color:var(--ink);flex:1}
+.help-caret{color:var(--dim);font-size:13px;flex:none}
+.help-body{padding:0 18px 8px}
+.help-item{padding:12px 0;border-top:1px solid var(--line)}
+.help-q{font-weight:600;color:var(--ink);margin-bottom:5px;font-size:14.5px}
+.help-a{color:#4a5763;line-height:1.6;font-size:14px}
+.help-foot{margin:18px 2px 0;padding:14px 16px;background:#eef3f6;border-radius:12px;color:var(--dim);font-size:13.5px;line-height:1.6}
+@media (max-width:900px){.navlink.help{margin-left:0}}
 .hwrow{display:grid;grid-template-columns:1fr 120px 180px 44px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 .hwname{border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:14.5px;font-weight:600}
 .hwprice{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;padding:0 4px 0 9px;background:#fff}
@@ -1195,6 +1211,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (state.view === "prices") return pricesReady ? renderPrices() : renderPricesNotReady();
     if (state.view === "fabrics") return renderFabrics();
     if (state.view === "hardware") return renderHardware();
+    if (state.view === "help") return renderHelp();
     return renderDashboard();
   }
   function configured() {
@@ -1402,6 +1419,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<button class="navlink ' + (active === "prices" ? "on" : "") + '" data-go="prices">Prices</button>' +
       '<button class="navlink ' + (active === "fabrics" ? "on" : "") + '" data-go="fabrics">Fabrics</button>' +
       '<button class="navlink ' + (active === "hardware" ? "on" : "") + '" data-go="hardware">Hardware</button>' +
+      '<button class="navlink help ' + (active === "help" ? "on" : "") + '" data-go="help">Help</button>' +
       '</nav>' +
       '<div class="topactions">' +
       '<span id="savechip">' + saveChipHTML() + '</span>' +
@@ -2453,6 +2471,126 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   var hardwareDraft = null;
   function hardwareDirty() { return hardwareDraft && JSON.stringify(hardwareDraft) !== JSON.stringify(hardwareSettings); }
   function ensureHardwareDraft() { if (!hardwareDraft) hardwareDraft = JSON.parse(JSON.stringify(hardwareSettings)); return hardwareDraft; }
+  /* ---------- Help / procedure manual ---------- */
+  var HELP_SECTIONS = [
+    {
+      id: "start", icon: "\u{1F3E0}", title: "Getting started",
+      items: [
+        { q: "What is this program?", a: "It keeps track of every blind job from start to finish. You record each job, the windows and blinds it needs, the fabric and hardware, and the program works out the cut sizes, the expected completion date, and the price. It replaces the old spreadsheet." },
+        { q: "How do I log in?", a: "Open the web address in your browser (bookmark it so it's easy to find). Type your email and password, then press Sign in. If you don't have a login yet, ask whoever manages the system to set one up for you." },
+        { q: "Do I need to save my work?", a: "No. Everything saves by itself as you go — you'll see \u201CSaving\u2026\u201D then \u201C\u2713 All changes saved\u201D near the top. The one exception is the Prices, Fabrics and Hardware tabs, where you press \u201CSave changes\u201D when you're done editing." },
+        { q: "Everyone sees the same information", a: "The program is shared. When you add a job or change something, everyone else's screen updates too. You're all looking at the same live information, so there's no need to email spreadsheets around." },
+        { q: "The tabs across the top", a: "Jobs (the main list), Clients, Quotes, Holidays, Prices, Fabrics, Hardware, and Help (this page). Tap any tab to switch to it. Not everyone sees Quotes \u2014 it's limited to selected staff." }
+      ]
+    },
+    {
+      id: "jobs", icon: "\u{1F4CB}", title: "Jobs \u2014 the main screen",
+      items: [
+        { q: "Adding a new job", a: "On the Jobs screen, press \u201CNew job\u201D (top right). A new job is created and you can start filling in its details \u2014 give it a name, choose the client, and add the windows." },
+        { q: "Opening a job", a: "Press the \u201CEdit\u201D button on the left of any job row to open it. Inside a job you'll find tabs: Job info, Windows, Cloth cut list, Labels and Pricing." },
+        { q: "What the columns mean", a: "SAN Ref is the job's reference number. Job is its name. Client and Address show who and where. Stage is how far along it is (tap the coloured box to change it). Expected is the completion date the program works out for you." },
+        { q: "Changing a job's stage", a: "Tap the coloured stage box on the job's row and pick the new stage (for example, \u201CIn Production\u201D or \u201CItem on Order\u201D). The colour changes to match. This is how you track progress." },
+        { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
+        { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
+        { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
+        { q: "Deleting a job", a: "The trash-can icon on the right of a job row deletes it. Be careful \u2014 this can't be undone. Only delete a job if it was entered by mistake." }
+      ]
+    },
+    {
+      id: "windows", icon: "\u{1FA9F}", title: "Windows & blinds",
+      items: [
+        { q: "Adding windows to a job", a: "Open the job and go to the Windows tab. Press \u201C+ Add window\u201D for each blind. Give it a name (e.g. \u201CBed 4\u201D), choose Face / Make or Rec / Tight, and type the ordered width and drop in millimetres." },
+        { q: "Face / Make vs Rec / Tight", a: "This tells the program how to work out the cloth size (Face takes off 26mm, Rec takes off 28mm). Always pick one for every window, or the cut list can't calculate correctly." },
+        { q: "Choosing fabric and colour", a: "Pick the fabric from the drop-down, then the colour box shows only that fabric's colours. Do the same for the baserail. These come from the Fabrics tab \u2014 if something's missing, it needs adding there." },
+        { q: "A one-off fabric that isn't in the list", a: "Tick the \u201Cone-off\u201D box on that window and the fabric and colour boxes become free text, so you can type anything for a special order." },
+        { q: "Overrolled or Underrolled", a: "Use the Roll drop-down to choose OR (overrolled) or UR (underrolled) for each blind." },
+        { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
+        { q: "Labels", a: "The Labels tab prints stick-on labels for each blind, two to a row." }
+      ]
+    },
+    {
+      id: "addons", icon: "\u{1F527}", title: "Add-ons (motorisation & hardware)",
+      items: [
+        { q: "Adding hardware to a job", a: "Open the job, go to the Windows tab, and scroll to the Add-ons panel below the windows. It's split into Motorisation and Blind hardware. Press \u201C+ Add\u201D under the right heading, choose the item, set the quantity, and choose whether it applies to the whole job or one particular window." },
+        { q: "Where the item list comes from", a: "The items you can choose come from the Hardware tab. If something you need isn't there, add it on the Hardware tab first (see the Hardware section below)." },
+        { q: "Spring Assist", a: "This is added automatically \u2014 any blind whose ordered width \u00D7 drop is over 4.5 square metres gets a Spring Assist ($36.50 + GST). You'll see it flagged on the cut list and priced on the Pricing tab. You don't need to add it yourself." }
+      ]
+    },
+    {
+      id: "pricing", icon: "\u{1F4B0}", title: "Pricing a job",
+      items: [
+        { q: "Seeing a job's price", a: "Open the job and go to the Pricing tab. It lists every blind with its price, then the add-ons, then a subtotal, GST and total. Press \u201CPrint pricing\u201D for a paper copy." },
+        { q: "How the blind price is worked out", a: "Each blind's price comes from its fabric's price group (A\u2013E) at the next size band up, then the client's discount for that group is taken off, then GST is added at the end." },
+        { q: "Why is a blind showing as \u201Cnot priced\u201D?", a: "A blind only prices automatically if its fabric has a price group set. One-off fabrics, or fabrics with no group, are flagged and left out of the total so you can price them by hand. To fix it, make sure the fabric has a price group on the Fabrics tab." },
+        { q: "How add-on discounts work", a: "Each hardware item is discounted by the client's category discount (Motorisation or Blind hardware). If the client has a special agreement on a particular item, that overrides the category \u2014 it can be a % off or a fixed $ price the client pays." },
+        { q: "Pricing never shows on the cut list or labels", a: "That's on purpose \u2014 prices only appear on the Pricing tab and its printout, never on the workshop paperwork." }
+      ]
+    },
+    {
+      id: "clients", icon: "\u{1F465}", title: "Clients",
+      items: [
+        { q: "Adding or editing a client", a: "Go to the Clients tab. Press \u201CNew client\u201D to add one, or \u201CEdit\u201D on an existing client. Fill in the name, contact details and address. Press Save." },
+        { q: "Favourites", a: "Tap the star next to a client to pin your regulars to the top of the list. Starred clients sort alphabetically at the top, then everyone else below." },
+        { q: "Lead time", a: "You can give a client their own lead time (working days) if theirs differs from the standard 25. Leave it blank to use the standard." },
+        { q: "The client's job-status link", a: "Each client has a private link (press \u201CLink\u201D to copy it) that shows them a simple, read-only view of their jobs \u2014 job name, address, stage and expected date. It never shows measurements, prices or other clients." },
+        { q: "Discounts", a: "Near the bottom of a client's Edit screen you can set their discounts: a % for each fabric group, a % for Motorisation and Blind hardware, and special-agreement deals on individual items. Leave anything blank for no discount. The screen scrolls if it gets long." }
+      ]
+    },
+    {
+      id: "quotes", icon: "\u{1F4C4}", title: "Quotes",
+      items: [
+        { q: "Who can see Quotes", a: "The Quotes tab is limited to selected staff. If you can't see it, that's why \u2014 ask whoever manages the system if you need access." },
+        { q: "Making a quote", a: "On the Quotes tab press \u201CNew quote\u201D, choose the client, add the windows and any extras, and the price is worked out as you go. Press Print for a customer-ready quotation." },
+        { q: "Quote by (AK / BA / Other)", a: "Each quote records who made it. It fills in automatically from who's logged in. The buttons at the top of the quote list let you filter to one person's quotes." },
+        { q: "Quotes vs job pricing", a: "Quotes are for pricing up work before it's ordered. The Pricing tab inside a job is for pricing jobs that are in production. They're separate." }
+      ]
+    },
+    {
+      id: "settings", icon: "\u2699\uFE0F", title: "Fabrics, Hardware, Prices & Holidays",
+      items: [
+        { q: "Editing the fabric list", a: "The Fabrics tab is where you add, rename or remove fabrics and baserails and their colours, and set each fabric's price group. Colours are hidden until you tap a fabric to expand it. Remember to press \u201CSave changes\u201D when you're done." },
+        { q: "Editing the hardware list", a: "The Hardware tab is where you manage add-on items (motorisation, brackets, etc.). Each has a name, a price and a category. Press \u201CSave changes\u201D to apply." },
+        { q: "Editing prices", a: "The Prices tab holds the blind price grids (Groups A\u2013E) and the install and GST settings. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
+        { q: "Public holidays", a: "The Holidays tab is where you record public holidays and shut-down periods. The program skips these when working out expected completion dates, so add them as they're announced." }
+      ]
+    },
+    {
+      id: "trouble", icon: "\u{1F6DF}", title: "Troubleshooting",
+      items: [
+        { q: "It says \u201CFailed to fetch\u201D when I try to log in", a: "This almost always means the database has gone to sleep after a quiet spell. It's not broken and nothing is lost. Whoever manages the system needs to log in to Supabase and press \u201CRestore/Resume\u201D on the project, wait a few minutes, then it works again." },
+        { q: "It says the settings file wasn't found", a: "This happens if you open the program file directly on a computer instead of the proper web address. Use the bookmarked web link instead." },
+        { q: "Something looks wrong or out of date", a: "First try a hard refresh: hold Ctrl and press F5 (on Windows). That reloads the latest version. If it's still wrong, note down exactly what you did and what happened, and report it." },
+        { q: "I changed something by accident", a: "On the Fabrics, Hardware and Prices tabs, if you haven't pressed \u201CSave changes\u201D yet, press \u201CUndo changes\u201D to throw away your edits. Elsewhere, changes save automatically, so just change it back." },
+        { q: "Backing up", a: "The \u201CBackup\u201D button (top right) downloads a copy of all the information as a file. It's worth doing this now and then, and definitely before any big change, so there's always a copy tucked away." }
+      ]
+    }
+  ];
+  function renderHelp() {
+    var q = (state.helpSearch || "").toLowerCase().trim();
+    function matches(it) { return !q || (it.q + " " + it.a).toLowerCase().indexOf(q) !== -1; }
+    var sections = HELP_SECTIONS.map(function (sec) {
+      var items = sec.items.filter(matches);
+      if (!items.length) return "";
+      var open = q ? true : (helpOpen[sec.id] !== false); /* open all when searching */
+      var body = items.map(function (it) {
+        return '<div class="help-item"><div class="help-q">' + esc(it.q) + '</div><div class="help-a">' + esc(it.a) + '</div></div>';
+      }).join("");
+      return '<div class="help-sec">' +
+        '<button class="help-sechd" data-help-toggle="' + sec.id + '">' +
+        '<span class="help-icon">' + sec.icon + '</span><span class="help-title">' + esc(sec.title) + '</span>' +
+        '<span class="help-caret">' + (open ? "\u25BE" : "\u25B8") + '</span></button>' +
+        (open ? '<div class="help-body">' + body + '</div>' : "") + '</div>';
+    }).join("");
+    var nothing = !sections;
+    app.innerHTML = topbar("help") + '<main class="wrap">' +
+      '<div class="pagehead"><div><h1>Help &amp; how-to</h1>' +
+      '<p class="sub">A plain-English guide to using the program. Tap a heading to open it, or search below.</p></div></div>' +
+      '<div class="help-searchwrap"><input class="help-search" placeholder="Search the help \u2014 e.g. \u201Cadd a window\u201D, \u201Cdiscount\u201D, \u201Cfailed to fetch\u201D" value="' + esc(state.helpSearch || "") + '" data-help-search></div>' +
+      (nothing ? '<div class="empty"><p>No help topics match \u201C' + esc(state.helpSearch || "") + '\u201D. Try a different word.</p></div>' : '<div class="help-list">' + sections + '</div>') +
+      '<div class="help-foot">Still stuck? Note down what you were doing and what happened, and pass it on to whoever manages the system. Most things are quick to sort out.</div>' +
+      '</main>' + footer();
+  }
+  var helpOpen = {};
   function renderHardware() {
     var d = ensureHardwareDraft();
     /* alphabetical within each category, but keep real array indices for editing */
@@ -3201,7 +3339,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
       "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client]," +
       "[data-fabdel],[data-basedel],[data-fabcoladd],[data-basecoladd],[data-fabcoldel],[data-basecoldel]," +
-      "[data-fabtoggle],[data-basetoggle],[data-hwdel]," +
+      "[data-fabtoggle],[data-basetoggle],[data-hwdel],[data-help-toggle]," +
       ".m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
@@ -3226,6 +3364,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     else if (t.hasAttribute("data-fabtoggle")) { var fk = +t.getAttribute("data-fabtoggle"); fabricOpen[fk] = !fabricOpen[fk]; render(); }
     else if (t.hasAttribute("data-basetoggle")) { var bk = +t.getAttribute("data-basetoggle"); baserailOpen[bk] = !baserailOpen[bk]; render(); }
     else if (t.hasAttribute("data-fabdel")) { ensureFabricDraft().fabrics.splice(+t.getAttribute("data-fabdel"), 1); render(); }
+    else if (t.hasAttribute("data-help-toggle")) { var hk = t.getAttribute("data-help-toggle"); helpOpen[hk] = helpOpen[hk] === false ? true : false; render(); }
     else if (t.hasAttribute("data-hwdel")) { ensureHardwareDraft().items.splice(+t.getAttribute("data-hwdel"), 1); render(); }
     else if (t.hasAttribute("data-basedel")) { ensureFabricDraft().baserails.splice(+t.getAttribute("data-basedel"), 1); render(); }
     else if (t.hasAttribute("data-fabcoladd")) { var fca = +t.getAttribute("data-fabcoladd"); fabricOpen[fca] = true; ensureFabricDraft().fabrics[fca].colours.push(""); render(); }
@@ -3360,6 +3499,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (!chip) { var hc = document.querySelector(".headctrls"); if (hc && priceDirty) render(); }
       return;
     }
+    if (el.hasAttribute("data-help-search")) { state.helpSearch = el.value; renderHelpKeepFocus(); return; }
     if (el.hasAttribute("data-qsearch")) { state.quoteSearch = el.value; renderQuotesKeepFocus(); return; }
     if (el.hasAttribute("data-q-field")) {
       var qf = getQuote(state.quoteId);
@@ -3530,6 +3670,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var val = state.quoteSearch; render();
     var s2 = document.querySelector("[data-qsearch]");
     if (s2) { s2.focus(); s2.value = val; try { s2.setSelectionRange(val.length, val.length); } catch (e) {} }
+  }
+  function renderHelpKeepFocus() {
+    var val = state.helpSearch; render();
+    var s3 = document.querySelector("[data-help-search]");
+    if (s3) { s3.focus(); s3.value = val; try { s3.setSelectionRange(val.length, val.length); } catch (e) {} }
   }
   function renderDashboardKeepFocus() {
     var val = state.search; render();
