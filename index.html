@@ -395,6 +395,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 }
 .pricegrid .ralign{text-align:right}
 .pricegrid .pgtag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px}
+.hwcattag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px;text-transform:none;letter-spacing:0}
+.spectag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:#e5dcf7;color:#5b3ba8;margin-left:3px}
+.pricegrid tr.aohdr td{background:#f5f8fa;padding-top:9px;font-size:13px}
+.addonspanel{margin-top:14px}
+.ao-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
+.ao-row .ao-name{font-weight:600;min-width:180px}
+.ao-item{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px;min-width:220px}
+.ao-qty,.ao-target{font-size:13px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+.ao-qty input{width:64px;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit;font-size:14px;text-align:right}
+.ao-target select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px}
+.discrow.special.on{background:#f6f2fe;border-radius:8px}
+.discgrid.special{grid-template-columns:1fr}
 .springnote{font-size:11.5px;color:#8a5a05;margin-top:3px;font-weight:600}
 .springmark{display:inline-block;color:#8a5a05;font-weight:700;font-size:14px;vertical-align:middle}
 .pricegrid tr.springline td{background:#fffaf0;border-top:1px solid var(--line)}
@@ -436,6 +448,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .btn.ghost{background:transparent;border:1px dashed var(--line);color:var(--dim)}
 .btn.ghost:hover{border-color:var(--teal);color:var(--teal)}
 .savedtag{color:#1d7a45;font-weight:600;font-size:13px;padding:8px 4px}
+.hwhead{display:grid;grid-template-columns:1fr 120px 180px 44px;gap:10px;padding:0 2px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:700}
+.hwrow{display:grid;grid-template-columns:1fr 120px 180px 44px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.hwname{border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:14.5px;font-weight:600}
+.hwprice{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;padding:0 4px 0 9px;background:#fff}
+.hwprice .dollar{color:var(--dim);font-size:14px}
+.hwprice input{border:0;background:transparent;padding:9px 4px;font-family:inherit;font-size:14px;width:100%;text-align:right;outline:none}
+.hwcat{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-family:inherit;font-size:13.5px;background:#fff}
+@media (max-width:640px){.hwhead{display:none}.hwrow{grid-template-columns:1fr 90px 44px;grid-template-areas:"name price del" "cat cat cat";gap:7px}.hwname{grid-area:name}.hwprice{grid-area:price}.hwcat{grid-area:cat}}
 .grpsel{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13.5px;color:var(--ink)}
 .discwrap{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
 .dischd{font-weight:700;font-size:14px;margin-bottom:4px}
@@ -720,6 +740,31 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var v = d[fabricGroup];
     return (typeof v === "number" && isFinite(v) && v > 0) ? v : 0;
   }
+  /* Which discount % applies to a hardware item for this client:
+     special-agreement on that item wins; otherwise the item's category %. */
+  function hardwareDiscountPct(client, item) {
+    if (!client || !item) return 0;
+    var sp = client.special_discounts;
+    if (sp && typeof sp === "object") {
+      var s = sp[item.id];
+      if (typeof s === "number" && isFinite(s) && s > 0) return s;
+    }
+    var catVal = item.cat === "Motorisation" ? client.motor_discount : client.hardware_discount;
+    return (typeof catVal === "number" && isFinite(catVal) && catVal > 0) ? catVal : 0;
+  }
+  /* Price a list of {id, qty} add-ons for a client -> array of priced lines. */
+  function priceAddons(client, addonList) {
+    return (addonList || []).map(function (a) {
+      var item = hardwareItem(a.id);
+      var qty = Math.max(1, parseInt(a.qty, 10) || 1);
+      if (!item) return { name: "(removed item)", qty: qty, priced: false };
+      var pct = hardwareDiscountPct(client, item);
+      var unit = item.price;
+      var net = unit * qty * (1 - pct / 100);
+      return { id: item.id, name: item.name, cat: item.cat, qty: qty, unit: unit, pct: pct,
+               net: net, priced: true, special: !!(client && client.special_discounts && client.special_discounts[item.id]) };
+    });
+  }
   /* Price one window of a production job:
      base (from the group's grid at width x drop) -> less client discount -> ex-GST line. */
   function jobWindowPrice(P, client, w) {
@@ -765,9 +810,31 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       } else anyUnpriced = true;
     });
     var netTotal = blindNetTotal + springTotal;   /* ex-GST subtotal incl. spring assists */
+    /* add-ons (motorisation & hardware) — each priced with the client's hardware discount */
+    var addonLines = priceAddons(client, jobAddons(job));
+    var addonTotal = 0, addonUnpriced = false;
+    addonLines.forEach(function (a) {
+      if (a.priced) addonTotal += a.net; else addonUnpriced = true;
+      /* tag each add-on with the window label it applies to, for display */
+      var src = jobAddons(job)[addonLines.indexOf(a)];
+    });
+    /* attach the "applies to" label to each add-on line */
+    var rawAddons = jobAddons(job);
+    addonLines.forEach(function (a, i) {
+      var tgt = rawAddons[i] ? rawAddons[i].target : "job";
+      if (!tgt || tgt === "job") { a.appliesTo = "Whole job"; }
+      else {
+        var wi = -1;
+        (job.windows || []).forEach(function (w, k) { if (w.id === tgt) wi = k; });
+        var wobj = (job.windows || []).filter(function (w) { return w.id === tgt; })[0];
+        a.appliesTo = wobj ? ((wobj.name || "").trim() || ("Window " + (wi + 1))) : "Whole job";
+      }
+    });
+    netTotal += addonTotal;
     var gst = netTotal * gstRate;
     return { lines: lines, client: client,
              blindNetTotal: blindNetTotal, springCount: springCount, springEach: springEach, springTotal: springTotal,
+             addonLines: addonLines, addonTotal: addonTotal, addonUnpriced: addonUnpriced,
              netTotal: netTotal, gstRate: gstRate, gst: gst,
              total: netTotal + gst, anyPriced: anyPriced, anyUnpriced: anyUnpriced };
   }
@@ -866,7 +933,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       jobAddress: r.job_address || "", dateReceived: r.date_received || "",
       status: normStatus(r.status), notes: r.notes || "", clientNote: r.client_note || "", clientNoteAt: r.client_note_at || "",
       expectedOverride: r.expected_override || "",
-      windows: Array.isArray(r.windows) ? r.windows : []
+      windows: Array.isArray(r.windows) ? r.windows : [],
+      addons: Array.isArray(r.addons) ? r.addons : []
     };
   }
   var FIELD_COL = {
@@ -953,6 +1021,42 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     return !r.error;
   }
 
+  /* ---------- hardware add-on items ---------- */
+  var HARDWARE_CATEGORIES = ["Motorisation", "Blind hardware"];
+  /* Seed list: motorisation + dual brackets come across from quoting, plus the new hardware.
+     id is stable (used on jobs); cat = discount category; price ex-GST. */
+  var BUILTIN_HARDWARE = { items: [
+    { id: "hw_dual",    name: "Dual brackets",      cat: "Blind hardware", price: 30 },
+    { id: "hw_bcover",  name: "Bracket covers",     cat: "Blind hardware", price: 0 },
+    { id: "hw_easylink", name: "Easy link brackets", cat: "Blind hardware", price: 0 },
+    { id: "hw_motor",   name: "Motorisation",       cat: "Motorisation",   price: 10 }
+  ] };
+  var hardwareSettings = { items: [] };
+  function normaliseHardware(d) {
+    var out = { items: [] };
+    if (d && Array.isArray(d.items)) {
+      out.items = d.items.filter(function (h) { return h && h.name; }).map(function (h) {
+        return {
+          id: h.id ? String(h.id) : ("hw_" + Math.random().toString(36).slice(2, 8)),
+          name: String(h.name),
+          cat: (HARDWARE_CATEGORIES.indexOf(h.cat) !== -1) ? h.cat : "Blind hardware",
+          price: isFinite(Number(h.price)) ? Number(h.price) : 0
+        };
+      });
+    }
+    return out;
+  }
+  function hardwareItem(id) {
+    return hardwareSettings.items.filter(function (x) { return x.id === id; })[0] || null;
+  }
+  async function saveHardwareSettings() {
+    var payload = { key: "hardware_items", data: hardwareSettings, updated_at: new Date().toISOString() };
+    markLocalWrite();
+    var r = await db.from("app_settings").upsert(payload, { onConflict: "key" });
+    if (r.error) toast("Could not save hardware. " + (r.error.message || ""));
+    return !r.error;
+  }
+
   /* ---------- supabase load + realtime ---------- */
   async function loadAll() {
     var res = await Promise.all([
@@ -962,7 +1066,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       db.from("quotes").select("*").order("created_at", { ascending: false }),
       db.from("price_lists").select("*").order("created_at", { ascending: false }),
       db.from("quote_access").select("email"),
-      db.from("app_settings").select("*").eq("key", "blind_fabrics")
+      db.from("app_settings").select("*")
     ]);
     if (res[0].error || res[1].error || res[2].error) {
       throw (res[0].error || res[1].error || res[2].error);
@@ -981,12 +1085,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       quoteAccess = (res[5].data || []).map(function (r) { return (r.email || "").toLowerCase(); });
       quoteAccessLoaded = true;
     } else { quoteAccess = []; quoteAccessLoaded = false; }
-    /* blind fabrics + baserails (optional until fabrics.sql has been run) */
-    if (res[6] && !res[6].error && res[6].data && res[6].data.length && res[6].data[0].data) {
-      fabricSettings = normaliseFabrics(res[6].data[0].data);
-    } else {
-      fabricSettings = normaliseFabrics(BUILTIN_FABRICS);
-    }
+    /* app_settings rows: blind fabrics + hardware (optional until their SQL is run) */
+    var settingsRows = (res[6] && !res[6].error) ? (res[6].data || []) : [];
+    function settingRow(key) { return settingsRows.filter(function (r) { return r.key === key; })[0]; }
+    var fRow = settingRow("blind_fabrics");
+    fabricSettings = (fRow && fRow.data) ? normaliseFabrics(fRow.data) : normaliseFabrics(BUILTIN_FABRICS);
+    var hRow = settingRow("hardware_items");
+    hardwareSettings = (hRow && hRow.data) ? normaliseHardware(hRow.data) : normaliseHardware(BUILTIN_HARDWARE);
     rebuildHolidaySet();
   }
   var QUOTE_AUTHORS = ["AK", "BA", "Other"];
@@ -1065,6 +1170,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (state.view === "quote") return renderQuoteEditor();
     if (state.view === "prices") return pricesReady ? renderPrices() : renderPricesNotReady();
     if (state.view === "fabrics") return renderFabrics();
+    if (state.view === "hardware") return renderHardware();
     return renderDashboard();
   }
   function configured() {
@@ -1271,6 +1377,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<button class="navlink ' + (active === "holidays" ? "on" : "") + '" data-go="holidays">Holidays</button>' +
       '<button class="navlink ' + (active === "prices" ? "on" : "") + '" data-go="prices">Prices</button>' +
       '<button class="navlink ' + (active === "fabrics" ? "on" : "") + '" data-go="fabrics">Fabrics</button>' +
+      '<button class="navlink ' + (active === "hardware" ? "on" : "") + '" data-go="hardware">Hardware</button>' +
       '</nav>' +
       '<div class="topactions">' +
       '<span id="savechip">' + saveChipHTML() + '</span>' +
@@ -1550,7 +1657,41 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     return '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="entryfoot"><button class="btn ' + (canAdd ? "primary" : "disabled") + '" data-action="addwin" ' + (canAdd ? "" : "disabled") + '>+ Add window</button>' +
       '<span class="count">' + job.windows.length + ' / ' + MAX_WINDOWS + ' windows</span></div></div>' +
+      addonsPanel(job) +
       '<p class="hint">Pick <b>Face / Make</b> or <b>Rec / Tight</b> for every window — the cut list and labels use it to work out the cloth size.</p>';
+  }
+  function jobAddons(job) { return Array.isArray(job.addons) ? job.addons : []; }
+  function addonsPanel(job) {
+    var items = hardwareSettings.items;
+    var list = jobAddons(job);
+    var itemOpts = '<option value="">Choose item…</option>' + items.slice().sort(function (a, b) {
+      return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
+    }).map(function (h) { return '<option value="' + esc(h.id) + '">' + esc(h.name) + ' — ' + esc(h.cat) + '</option>'; }).join("");
+    function targetOpts(sel) {
+      var o = '<option value="job"' + (sel === "job" ? " selected" : "") + '>Whole job</option>';
+      o += job.windows.map(function (w, i) {
+        var lbl = (w.name || "").trim() || ("Window " + (i + 1));
+        return '<option value="' + esc(w.id) + '"' + (sel === w.id ? " selected" : "") + '>' + esc(lbl) + '</option>';
+      }).join("");
+      return o;
+    }
+    var rows = list.map(function (a, i) {
+      var item = hardwareItem(a.id);
+      var nameCell = item
+        ? '<span class="ao-name">' + esc(item.name) + ' <span class="hwcattag">' + esc(item.cat) + '</span></span>'
+        : '<select class="ao-item" data-ao-item="' + i + '">' + itemOpts.replace('value="' + esc(a.id) + '"', 'value="' + esc(a.id) + '" selected') + '</select>';
+      return '<div class="ao-row">' +
+        (item ? nameCell : nameCell) +
+        '<span class="ao-qty">Qty <input type="number" inputmode="numeric" min="1" value="' + esc(a.qty || 1) + '" data-ao-qty="' + i + '"></span>' +
+        '<span class="ao-target">Applies to <select data-ao-target="' + i + '">' + targetOpts(a.target || "job") + '</select></span>' +
+        '<button class="iconbtn del" data-ao-del="' + i + '" title="Remove add-on" aria-label="Remove add-on">\u{1F5D1}</button>' +
+        '</div>';
+    }).join("");
+    return '<div class="card pad addonspanel"><div class="cardbar"><div><b>Add-ons</b> <span class="dim">— motorisation &amp; hardware for this job</span></div>' +
+      (items.length ? '<button class="btn small" data-action="addon-add">+ Add item</button>' : '') + '</div>' +
+      (!items.length ? '<p class="dim">No hardware items yet. Add them on the <b>Hardware</b> tab first.</p>'
+        : (list.length ? rows : '<p class="dim">No add-ons on this job. Use “+ Add item” to add motorisation, brackets, etc.</p>')) +
+      '</div>';
   }
   function fabricSummary(w) {
     var f = (w.fabric || "").trim(), c = (w.fabricColour || "").trim();
@@ -1599,6 +1740,26 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '<td class="mono ralign strong">' + money(pr.springTotal + springGst) + '</td></tr>';
     }
 
+    var addonRows = "";
+    if (pr.addonLines.length) {
+      addonRows += '<tr class="aohdr"><td></td><td colspan="8"><b>Add-ons</b></td></tr>';
+      addonRows += pr.addonLines.map(function (a) {
+        if (!a.priced) {
+          return '<tr class="unpriced"><td></td><td colspan="3">' + esc(a.name) + '</td><td colspan="5" class="pxnote">Item no longer in the hardware list</td></tr>';
+        }
+        var g = a.net * pr.gstRate;
+        var discLbl = a.pct ? (a.pct + "%" + (a.special ? ' <span class="spectag">special</span>' : "")) : "—";
+        return '<tr><td></td><td>' + esc(a.name) + ' <span class="hwcattag">' + esc(a.cat) + '</span></td>' +
+          '<td class="dim">' + esc(a.appliesTo) + '</td>' +
+          '<td class="mono ralign">' + money(a.unit) + '</td>' +
+          '<td class="mono ralign">× ' + a.qty + '</td>' +
+          '<td class="mono ralign">' + discLbl + '</td>' +
+          '<td class="mono ralign">' + money(a.net) + '</td>' +
+          '<td class="mono ralign">' + money(g) + '</td>' +
+          '<td class="mono ralign strong">' + money(a.net + g) + '</td></tr>';
+      }).join("");
+    }
+
     var totals =
       '<tr class="tsub"><td colspan="6" class="ralign">Subtotal (excl GST)</td><td class="mono ralign strong">' + money(pr.netTotal) + '</td><td class="mono ralign">' + money(pr.gst) + '</td><td class="mono ralign">' + money(pr.total) + '</td></tr>' +
       '<tr class="ttot"><td colspan="6" class="ralign">Total (incl GST)</td><td colspan="2"></td><td class="mono ralign strong">' + money(pr.total) + '</td></tr>';
@@ -1612,7 +1773,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       warn +
       '<div class="tablescroll"><table class="grid pricegrid"><thead><tr><th>#</th><th>Window</th><th>Fabric</th><th>Size (mm)</th>' +
       '<th class="ralign">Base</th><th class="ralign">Disc</th><th class="ralign">Net</th><th class="ralign">GST</th><th class="ralign">Inc GST</th></tr></thead>' +
-      '<tbody>' + rows + springRow + totals + '</tbody></table></div></div>' +
+      '<tbody>' + rows + springRow + addonRows + totals + '</tbody></table></div></div>' +
       noDisc +
       '<div class="ruleline">Each window: base price (from its fabric\u2019s group grid at the next size band up) − this client\u2019s discount for that group. GST added on the subtotal.</div>';
   }
@@ -1642,6 +1803,19 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '<td class="ra">' + money(pr.springTotal) + '</td><td class="ra">' + money(springGst) + '</td>' +
         '<td class="ra">' + money(pr.springTotal + springGst) + '</td></tr>';
     }
+    var addonRows = "";
+    if (pr.addonLines.length) {
+      addonRows += '<tr class="pt-aohdr"><td></td><td colspan="8"><b>Add-ons</b></td></tr>';
+      addonRows += pr.addonLines.map(function (a) {
+        if (!a.priced) return '<tr><td></td><td colspan="3">' + esc(a.name) + '</td><td colspan="5">(removed)</td></tr>';
+        var g = a.net * pr.gstRate;
+        return '<tr><td></td><td>' + esc(a.name) + ' (' + esc(a.cat) + ')</td><td>' + esc(a.appliesTo) + '</td>' +
+          '<td class="ra">' + money(a.unit) + '</td><td class="ra">× ' + a.qty + '</td>' +
+          '<td class="ra">' + (a.pct ? a.pct + "%" : "—") + '</td>' +
+          '<td class="ra">' + money(a.net) + '</td><td class="ra">' + money(g) + '</td>' +
+          '<td class="ra">' + money(a.net + g) + '</td></tr>';
+      }).join("");
+    }
     var totals =
       '<tr class="pt-sub"><td colspan="6" class="ra">Subtotal (excl GST)</td><td class="ra">' + money(pr.netTotal) + '</td><td class="ra">' + money(pr.gst) + '</td><td class="ra">' + money(pr.total) + '</td></tr>' +
       '<tr class="pt-tot"><td colspan="6" class="ra">Total (incl GST)</td><td colspan="2"></td><td class="ra">' + money(pr.total) + '</td></tr>';
@@ -1654,7 +1828,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
       '<table class="p-grid qgrid"><thead><tr><th>#</th><th>Window</th><th>Fabric</th><th>Size</th>' +
       '<th class="ra">Base</th><th class="ra">Disc</th><th class="ra">Net</th><th class="ra">GST</th><th class="ra">Inc GST</th></tr></thead>' +
-      '<tbody>' + rows + springRow + totals + '</tbody></table>' +
+      '<tbody>' + rows + springRow + addonRows + totals + '</tbody></table>' +
       (pr.anyUnpriced ? '<p class="p-foot">Windows shown without a price need pricing by hand and are not included in the total.</p>' : "") +
       '<p class="p-foot">' + esc(companyLine()) + '</p></div>');
   }
@@ -2148,11 +2322,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     /* flip the header control between "All changes saved" and Save/Undo without disturbing focus */
     var host = document.querySelector(".pagehead .headctrls");
     if (!host) return;
-    var dirty = fabricDirty();
-    var hasButtons = !!host.querySelector('[data-action="fabrics-save"]');
+    var onHardware = state.view === "hardware";
+    var dirty = onHardware ? hardwareDirty() : fabricDirty();
+    var saveAction = onHardware ? "hardware-save" : "fabrics-save";
+    var undoAction = onHardware ? "hardware-undo" : "fabrics-undo";
+    var hasButtons = !!host.querySelector('[data-action="' + saveAction + '"]');
     if (dirty && !hasButtons) {
-      host.innerHTML = '<button class="btn" data-action="fabrics-undo">Undo changes</button>' +
-        '<button class="btn primary" data-action="fabrics-save">Save changes</button>';
+      host.innerHTML = '<button class="btn" data-action="' + undoAction + '">Undo changes</button>' +
+        '<button class="btn primary" data-action="' + saveAction + '">Save changes</button>';
     } else if (!dirty && hasButtons) {
       host.innerHTML = '<span class="savedtag">All changes saved</span>';
     }
@@ -2225,6 +2402,63 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       (dirty ? '<p class="hint">Changes are not live until you press <b>Save changes</b>.</p>' : '') +
       '</main>' + footer();
   }
+  /* ---------- Hardware management tab ---------- */
+  var hardwareDraft = null;
+  function hardwareDirty() { return hardwareDraft && JSON.stringify(hardwareDraft) !== JSON.stringify(hardwareSettings); }
+  function ensureHardwareDraft() { if (!hardwareDraft) hardwareDraft = JSON.parse(JSON.stringify(hardwareSettings)); return hardwareDraft; }
+  function renderHardware() {
+    var d = ensureHardwareDraft();
+    /* alphabetical within each category, but keep real array indices for editing */
+    function catRows(cat) {
+      var order = d.items.map(function (h, i) { return i; })
+        .filter(function (i) { return d.items[i].cat === cat; })
+        .sort(function (a, b) { return (d.items[a].name || "").toLowerCase().localeCompare((d.items[b].name || "").toLowerCase()); });
+      if (!order.length) return '<p class="dim">No items in this category yet.</p>';
+      return order.map(function (hi) {
+        var h = d.items[hi];
+        var catOpts = HARDWARE_CATEGORIES.map(function (c) { return '<option ' + (c === h.cat ? "selected" : "") + '>' + esc(c) + '</option>'; }).join("");
+        return '<div class="hwrow">' +
+          '<input class="hwname" value="' + esc(h.name) + '" data-hwname="' + hi + '" placeholder="Item name">' +
+          '<span class="hwprice"><span class="dollar">$</span><input type="number" inputmode="decimal" min="0" step="0.5" value="' + esc(h.price) + '" data-hwprice="' + hi + '" placeholder="0"></span>' +
+          '<select class="hwcat" data-hwcat="' + hi + '">' + catOpts + '</select>' +
+          '<button class="iconbtn del" data-hwdel="' + hi + '" title="Remove item" aria-label="Remove item">\u{1F5D1}</button>' +
+          '</div>';
+      }).join("");
+    }
+    var dirty = hardwareDirty();
+    app.innerHTML = topbar("hardware") + '<main class="wrap">' +
+      '<div class="pagehead"><div><h1>Hardware &amp; add-ons</h1>' +
+      '<p class="sub">Items you can add to jobs — per window or per job. Each has a price and a discount category.</p></div>' +
+      '<div class="headctrls">' +
+      (dirty ? '<button class="btn" data-action="hardware-undo">Undo changes</button>' +
+               '<button class="btn primary" data-action="hardware-save">Save changes</button>'
+             : '<span class="savedtag">All changes saved</span>') +
+      '</div></div>' +
+      HARDWARE_CATEGORIES.map(function (cat) {
+        return '<div class="card pad"><div class="cardbar"><div><b>' + esc(cat) + '</b></div>' +
+          '<button class="btn small" data-action="hardware-add" data-cat="' + esc(cat) + '">+ Add item</button></div>' +
+          '<div class="hwhead"><span>Item</span><span>Price</span><span>Category</span><span></span></div>' +
+          catRows(cat) + '</div>';
+      }).join("") +
+      (dirty ? '<p class="hint">Changes are not live until you press <b>Save changes</b>.</p>' : '') +
+      '</main>' + footer();
+  }
+  async function saveHardwareDraft() {
+    var clean = { items: [] };
+    (hardwareDraft.items || []).forEach(function (h) {
+      var name = (h.name || "").trim(); if (!name) return;
+      clean.items.push({
+        id: h.id || ("hw_" + Math.random().toString(36).slice(2, 8)),
+        name: name,
+        cat: (HARDWARE_CATEGORIES.indexOf(h.cat) !== -1) ? h.cat : "Blind hardware",
+        price: isFinite(Number(h.price)) ? Number(h.price) : 0
+      });
+    });
+    hardwareSettings = clean;
+    var okSave = await saveHardwareSettings();
+    if (okSave) { hardwareDraft = null; toast("Hardware saved."); render(); }
+  }
+
   async function saveFabricsDraft() {
     // strip blank names/colours before saving
     var clean = { fabrics: [], baserails: [] };
@@ -2604,6 +2838,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     jobs = jobs.filter(function (x) { return x.id !== id; }); render();
   }
   async function saveWindows(job) { queueJobPatch(job.id, "windows", job.windows); }
+  async function saveAddons(job) { queueJobPatch(job.id, "addons", job.addons || []); }
 
   async function newClient() {
     markLocalWrite();
@@ -2616,6 +2851,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (d && typeof d === "object") return d;
     return {};
   }
+  function clientSpecial(c) {
+    var d = c && c.special_discounts;
+    if (d && typeof d === "object") return d;
+    return {};
+  }
   function discountGrid(c) {
     var disc = clientDiscounts(c);
     var rows = FABRIC_GROUPS.map(function (g) {
@@ -2624,9 +2864,39 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '<span class="discinput"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" ' +
         'value="' + esc(v) + '" placeholder="0" data-disc="' + esc(g) + '"><span class="pct">%</span></span></div>';
     }).join("");
+    /* the two hardware category discounts */
+    function catInput(label, key, val) {
+      var v = (val === 0 || val) ? val : "";
+      return '<div class="discrow"><span class="disclbl">' + esc(label) + '</span>' +
+        '<span class="discinput"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" ' +
+        'value="' + esc(v) + '" placeholder="0" data-catdisc="' + esc(key) + '"><span class="pct">%</span></span></div>';
+    }
+    var catRows = catInput("Motorisation", "Motorisation", c.motor_discount) +
+                  catInput("Blind hardware", "Blind hardware", c.hardware_discount);
+    /* special-agreement: a % against individually-chosen hardware items */
+    var special = clientSpecial(c);
+    var specialRows = hardwareSettings.items.slice().sort(function (a, b) {
+      return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
+    }).map(function (h) {
+      var v = (special[h.id] === 0 || special[h.id]) ? special[h.id] : "";
+      var on = v !== "";
+      return '<div class="discrow special' + (on ? " on" : "") + '"><span class="disclbl">' + esc(h.name) +
+        ' <span class="hwcattag">' + esc(h.cat) + '</span></span>' +
+        '<span class="discinput"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" ' +
+        'value="' + esc(v) + '" placeholder="—" data-special="' + esc(h.id) + '"><span class="pct">%</span></span></div>';
+    }).join("");
     return '<div class="discwrap"><div class="dischd">Fabric group discounts</div>' +
       '<p class="hint" style="margin:0 0 10px">The % off this client gets for each fabric group. Leave blank for no discount.</p>' +
-      '<div class="discgrid">' + rows + '</div></div>';
+      '<div class="discgrid">' + rows + '</div>' +
+      '<div class="dischd" style="margin-top:16px">Hardware discounts</div>' +
+      '<p class="hint" style="margin:0 0 10px">The % off on all items in each hardware category.</p>' +
+      '<div class="discgrid">' + catRows + '</div>' +
+      (hardwareSettings.items.length ?
+        '<div class="dischd" style="margin-top:16px">Special agreement <span class="dim" style="font-weight:400">(overrides the category % for these items)</span></div>' +
+        '<p class="hint" style="margin:0 0 10px">Set a % against individual items for a special deal. Leave blank to just use the category discount above.</p>' +
+        '<div class="discgrid special">' + specialRows + '</div>'
+      : "") +
+      '</div>';
   }
   function editClientDialog(id) {
     var c = getClient(id); if (!c) return;
@@ -2661,6 +2931,24 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           if (isFinite(n) && n > 0) disc[el.getAttribute("data-disc")] = n;
         });
         patch.fabric_discounts = disc; c.fabric_discounts = disc;
+        /* hardware category discounts */
+        function catVal(key) {
+          var el = document.querySelector('#modal [data-catdisc="' + key + '"]');
+          if (!el) return null;
+          var n = parseFloat(String(el.value).trim());
+          return (isFinite(n) && n > 0) ? n : null;
+        }
+        patch.motor_discount = catVal("Motorisation"); c.motor_discount = patch.motor_discount;
+        patch.hardware_discount = catVal("Blind hardware"); c.hardware_discount = patch.hardware_discount;
+        /* special-agreement per-item discounts */
+        var special = {};
+        [].slice.call(document.querySelectorAll("#modal [data-special]")).forEach(function (el) {
+          var raw = String(el.value).trim();
+          if (raw === "") return;
+          var n = parseFloat(raw);
+          if (isFinite(n) && n > 0) special[el.getAttribute("data-special")] = n;
+        });
+        patch.special_discounts = special; c.special_discounts = special;
         markLocalWrite();
         var r = await db.from("clients").update(patch).eq("id", c.id);
         if (r.error) toast("Save failed."); render();
@@ -2844,14 +3132,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   /* ---------- events ---------- */
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
-      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday]," +
+      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday],[data-ao-del]," +
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
       "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client]," +
       "[data-fabdel],[data-basedel],[data-fabcoladd],[data-basecoladd],[data-fabcoldel],[data-basecoldel]," +
-      "[data-fabtoggle],[data-basetoggle]," +
+      "[data-fabtoggle],[data-basetoggle],[data-hwdel]," +
       ".m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
@@ -2876,6 +3164,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     else if (t.hasAttribute("data-fabtoggle")) { var fk = +t.getAttribute("data-fabtoggle"); fabricOpen[fk] = !fabricOpen[fk]; render(); }
     else if (t.hasAttribute("data-basetoggle")) { var bk = +t.getAttribute("data-basetoggle"); baserailOpen[bk] = !baserailOpen[bk]; render(); }
     else if (t.hasAttribute("data-fabdel")) { ensureFabricDraft().fabrics.splice(+t.getAttribute("data-fabdel"), 1); render(); }
+    else if (t.hasAttribute("data-hwdel")) { ensureHardwareDraft().items.splice(+t.getAttribute("data-hwdel"), 1); render(); }
     else if (t.hasAttribute("data-basedel")) { ensureFabricDraft().baserails.splice(+t.getAttribute("data-basedel"), 1); render(); }
     else if (t.hasAttribute("data-fabcoladd")) { var fca = +t.getAttribute("data-fabcoladd"); fabricOpen[fca] = true; ensureFabricDraft().fabrics[fca].colours.push(""); render(); }
     else if (t.hasAttribute("data-basecoladd")) { var bca = +t.getAttribute("data-basecoladd"); baserailOpen[bca] = true; ensureFabricDraft().baserails[bca].colours.push(""); render(); }
@@ -2926,6 +3215,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (!job.windows.length) job.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "" });
       saveWindows(job); render();
     }
+    else if (t.hasAttribute("data-ao-del")) {
+      var jobD = getJob(state.jobId);
+      jobD.addons = jobAddons(jobD).filter(function (a, i) { return i !== +t.getAttribute("data-ao-del"); });
+      saveAddons(jobD); render();
+    }
     else if (t.classList.contains("m-close")) closeModal();
     else if (t.hasAttribute("data-msave")) { if (modalSave) modalSave(); closeModal(); }
     else if (t.hasAttribute("data-action")) {
@@ -2933,6 +3227,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (a === "newjob") newJob();
       else if (a === "newclient") newClient();
       else if (a === "addwin") { var jb = getJob(state.jobId); if (jb.windows.length < MAX_WINDOWS) { jb.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "" }); saveWindows(jb); render(); } }
+      else if (a === "addon-add") { var ja = getJob(state.jobId); if (!Array.isArray(ja.addons)) ja.addons = []; ja.addons.push({ id: "", qty: 1, target: "job" }); saveAddons(ja); render(); }
       else if (a === "clientview") { state.clientView = t.checked; render(); }
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
@@ -2943,6 +3238,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "fabrics-undo") { fabricDraft = null; render(); }
       else if (a === "fabric-add") { var nf = ensureFabricDraft().fabrics; nf.push({ name: "", priceGroup: "", colours: [] }); fabricOpen[nf.length - 1] = true; render(); }
       else if (a === "baserail-add") { var nb = ensureFabricDraft().baserails; nb.push({ type: "", colours: [] }); baserailOpen[nb.length - 1] = true; render(); }
+      else if (a === "hardware-save") saveHardwareDraft();
+      else if (a === "hardware-undo") { hardwareDraft = null; render(); }
+      else if (a === "hardware-add") { ensureHardwareDraft().items.push({ id: "hw_" + Math.random().toString(36).slice(2, 8), name: "", cat: t.getAttribute("data-cat") || "Blind hardware", price: 0 }); render(); }
       else if (a === "price-save") savePrices();
       else if (a === "price-revert") revertPrices();
       else if (a === "price-newlist") newPriceList();
@@ -3035,6 +3333,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (jN) { noteChanged(jN, el.value); jN.clientNote = el.value; queueJobPatch(jN.id, "client_note", el.value); }
       return;
     }
+    if (el.hasAttribute("data-ao-qty")) { var jq = getJob(state.jobId); var aq = jobAddons(jq)[+el.getAttribute("data-ao-qty")]; if (aq) { aq.qty = Math.max(1, parseInt(el.value, 10) || 1); saveAddons(jq); } return; }
+    if (el.hasAttribute("data-hwname")) { ensureHardwareDraft().items[+el.getAttribute("data-hwname")].name = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute("data-hwprice")) { ensureHardwareDraft().items[+el.getAttribute("data-hwprice")].price = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabname")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabname")].name = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-basename")) { ensureFabricDraft().baserails[+el.getAttribute("data-basename")].type = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
@@ -3051,6 +3352,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   document.addEventListener("change", function (e) {
     var el = e.target;
     if (el.hasAttribute && el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute && el.hasAttribute("data-hwcat")) { ensureHardwareDraft().items[+el.getAttribute("data-hwcat")].cat = el.value; render(); return; }
+    if (el.hasAttribute && el.hasAttribute("data-ao-item")) { var ji = getJob(state.jobId); var ai = jobAddons(ji)[+el.getAttribute("data-ao-item")]; if (ai) { ai.id = el.value; saveAddons(ji); render(); } return; }
+    if (el.hasAttribute && el.hasAttribute("data-ao-target")) { var jt = getJob(state.jobId); var at = jobAddons(jt)[+el.getAttribute("data-ao-target")]; if (at) { at.target = el.value; saveAddons(jt); } return; }
     if (el.hasAttribute("data-exp-job")) { setExpectedOverride(el.getAttribute("data-exp-job"), el.value); return; }
     if (el.hasAttribute("data-exp-show")) { return; }
     if (el.hasAttribute("data-status-job")) {
