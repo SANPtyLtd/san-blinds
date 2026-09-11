@@ -143,6 +143,7 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
 .entry input:focus,.entry select:focus{outline:2px solid var(--teal);border-color:var(--teal)}
 .entry input.num{font-family:var(--mono);text-align:right}
 .entryfoot{display:flex;align-items:center;justify-content:space-between;padding:14px 18px}
+.addbtns{display:flex;gap:10px;flex-wrap:wrap}
 .count{color:var(--dim);font-size:13px;font-family:var(--mono)}
 .hint{color:var(--dim);font-size:13.5px;margin:14px 2px 0}
 .ruleline{margin:14px 2px 0;color:var(--dim);font-size:12.5px;font-family:var(--mono)}
@@ -437,6 +438,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .winentry .rollsel{min-width:64px}
 .winentry input.narrow{max-width:82px}
 .winentry .oneoffcell{text-align:center}
+.sptag{display:inline-block;margin-left:5px;font-size:10px;font-weight:800;color:#fff;background:#7a5bc0;border-radius:4px;padding:1px 5px;vertical-align:middle}
+.specialrow td{background:#faf8ff}
+.spopts{display:flex;flex-direction:column;gap:3px}
+.spbox{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--dim);white-space:nowrap;cursor:pointer;line-height:1.2}
+.spbox.on{color:#5b3ba8;font-weight:700}
+.spbox input{margin:0}
 .oneoff{display:inline-flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;color:var(--dim);cursor:pointer;line-height:1}
 .oneoff input{margin:0}
 /* Fabrics management tab */
@@ -936,6 +943,27 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (fr === "Rec / Tight") return w - 28;
     return null;
   }
+  /* Special windows deduct a different amount from the width.
+     specialType is one of: "linked", "e6", "linked_e6".
+       Linked           -> Face -22 / Rec -24
+       E6 Motor         -> Face -28 / Rec -30
+       Linked + E6 Motor-> Face -22 / Rec -24  */
+  var SPECIAL_DEDUCT = {
+    linked:    { "Face / Make": 22, "Rec / Tight": 24 },
+    e6:        { "Face / Make": 28, "Rec / Tight": 30 },
+    linked_e6: { "Face / Make": 22, "Rec / Tight": 24 }
+  };
+  function windowClothWidth(w) {
+    var wd = num(w.width); if (wd === null) return null;
+    if (w.special && w.specialType && SPECIAL_DEDUCT[w.specialType]) {
+      var d = SPECIAL_DEDUCT[w.specialType][w.faceRec];
+      if (d === undefined) return null;   /* need Face/Rec chosen */
+      return wd - d;
+    }
+    return clothWidth(w.faceRec, w.width);
+  }
+  function windowTubeLength(w) { return windowClothWidth(w); }
+  function windowBaserail(w) { var cw = windowClothWidth(w); return cw === null ? null : cw + 2; }
   function clothDrop(d) { d = num(d); return d === null ? null : d + 250; }
   /* LF / Sheer fabrics need extra length: cloth drop = drop + 400 instead of + 250.
      One-off (custom-typed) fabrics always use the standard + 250. */
@@ -1696,7 +1724,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       // roll direction
       var rollOpts = '<option value="">—</option>' + ["OR", "UR"].map(function (o) { return opt(o, w.roll); }).join("");
       var rollCell = '<select class="rollsel" data-win="' + w.id + '" data-wf="roll">' + rollOpts + '</select>';
-      return '<tr><td class="idx">' + (i + 1) + '</td>' +
+      // special-window options (pick one): Linked / E6 Motor / Linked + E6 Motor
+      var specialCell;
+      if (w.special) {
+        var st = w.specialType || "linked";
+        function sbox(val, label) {
+          return '<label class="spbox' + (st === val ? " on" : "") + '"><input type="checkbox" data-win="' + w.id + '" data-sptype="' + val + '" ' + (st === val ? "checked" : "") + '><span>' + label + '</span></label>';
+        }
+        specialCell = '<div class="spopts">' + sbox("linked", "Linked") + sbox("e6", "E6 Motor") + sbox("linked_e6", "Linked + E6") + '</div>';
+      } else {
+        specialCell = '<span class="dim">—</span>';
+      }
+      return '<tr' + (w.special ? ' class="specialrow"' : '') + '><td class="idx">' + (i + 1) + (w.special ? '<span class="sptag">S</span>' : '') + '</td>' +
         '<td><input value="' + esc(w.name || "") + '" placeholder="Window name" data-win="' + w.id + '" data-wf="name"></td>' +
         '<td><select class="frsel" data-win="' + w.id + '" data-wf="faceRec">' + frOpts + '</select></td>' +
         '<td><input class="mono num narrow" type="number" value="' + esc(w.width || "") + '" data-win="' + w.id + '" data-wf="width"></td>' +
@@ -1708,14 +1747,16 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '<td>' + baserailCell + '</td>' +
         '<td>' + baserailColourCell + '</td>' +
         '<td>' + rollCell + '</td>' +
+        '<td>' + specialCell + '</td>' +
         '<td class="rowact"><button class="btn small danger-ghost" data-del-win="' + w.id + '">✕</button></td></tr>';
     }).join("");
     var canAdd = job.windows.length < MAX_WINDOWS;
-    return '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '<div class="entryfoot"><button class="btn ' + (canAdd ? "primary" : "disabled") + '" data-action="addwin" ' + (canAdd ? "" : "disabled") + '>+ Add window</button>' +
+    return '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th>Special</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="entryfoot"><div class="addbtns"><button class="btn ' + (canAdd ? "primary" : "disabled") + '" data-action="addwin" ' + (canAdd ? "" : "disabled") + '>+ Add window</button>' +
+      '<button class="btn ' + (canAdd ? "" : "disabled") + '" data-action="addspecialwin" ' + (canAdd ? "" : "disabled") + '>+ Add Special Window</button></div>' +
       '<span class="count">' + job.windows.length + ' / ' + MAX_WINDOWS + ' windows</span></div></div>' +
       addonsPanel(job) +
-      '<p class="hint">Pick <b>Face / Make</b> or <b>Rec / Tight</b> for every window — the cut list and labels use it to work out the cloth size.</p>';
+      '<p class="hint">Pick <b>Face / Make</b> or <b>Rec / Tight</b> for every window. <b>Special Windows</b> (marked <span class="sptag">S</span>) use a different width allowance \u2014 tick Linked, E6 Motor, or Linked + E6 Motor.</p>';
   }
   function jobAddons(job) { return Array.isArray(job.addons) ? job.addons : []; }
   function addonsPanel(job) {
@@ -1915,15 +1956,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function clothTab(job) {
     var ws = activeWindows(job);
     var rows = ws.map(function (w, i) {
-      var cw = clothWidth(w.faceRec, w.width);
+      var cw = windowClothWidth(w);
       var spring = needsSpringAssist(w) ? '<span class="springyes">Spring Assist</span>' : '<span class="dim">—</span>';
       return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") +
-        '</td><td class="mono shade">' + mm(tubeLength(w.faceRec, w.width)) +
+        '</td><td class="mono shade">' + mm(windowTubeLength(w)) +
         '</td><td>' + esc(fabricSummary(w) || "—") +
         '</td><td class="mono shade strong">' + mm(cw) +
         '</td><td class="mono shade">' + mm(windowClothDrop(w)) +
         '</td><td>' + esc(baserailSummary(w) || "—") +
-        '</td><td class="mono shade">' + mm(baserail(w.faceRec, w.width)) +
+        '</td><td class="mono shade">' + mm(windowBaserail(w)) +
         '</td><td>' + spring + '</td></tr>';
     }).join("");
     var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th class="shade">Tube length</th><th>Fabric / colour</th><th class="shade">Cloth width</th><th class="shade">Cloth drop</th><th>Baserail type / colour</th><th class="shade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -1940,14 +1981,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       (ws.length ? '<button class="btn primary" data-action="print-labels">Print labels</button>' : "") + '</div>' + content + '</div>';
   }
   function labelHTML(job, w, i) {
-    var cw = clothWidth(w.faceRec, w.width);
+    var cw = windowClothWidth(w);
     return '<div class="label"><div class="lb-top"><span class="lb-co">SAN Pty Ltd</span><span class="lb-addr">55 Lampton Ave, Derwent Park</span></div>' +
       '<div class="lb-ref"><span class="mono">' + esc(job.clientRef || "") + '</span><span>' + esc(job.jobName || "") + '</span></div>' +
       '<div class="lb-blind"><b>Window ' + (i + 1) + '</b><span>' + esc(w.name || "") + '</span></div>' +
       '<table class="lb-grid"><tr><td>Order size</td><td class="mono">' + mm(num(w.width)) + '</td><td class="mono">' + mm(num(w.drop)) + '</td></tr>' +
       '<tr><td>Type</td><td colspan="2">' + esc(w.faceRec || "") + '</td></tr>' +
       '<tr><td>Cloth</td><td class="mono strong">' + mm(cw) + '</td><td class="mono strong">' + mm(windowClothDrop(w)) + '</td></tr>' +
-      '<tr><td>Tube / Baserail</td><td class="mono">' + mm(tubeLength(w.faceRec, w.width)) + '</td><td class="mono">' + mm(baserail(w.faceRec, w.width)) + '</td></tr></table></div>';
+      '<tr><td>Tube / Baserail</td><td class="mono">' + mm(windowTubeLength(w)) + '</td><td class="mono">' + mm(windowBaserail(w)) + '</td></tr></table></div>';
   }
 
 
@@ -2521,6 +2562,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Choosing fabric and colour", a: "Pick the fabric from the drop-down, then the colour box shows only that fabric's colours. Do the same for the baserail. These come from the Fabrics tab \u2014 if something's missing, it needs adding there." },
         { q: "A one-off fabric that isn't in the list", a: "Tick the \u201Cone-off\u201D box on that window and the fabric and colour boxes become free text, so you can type anything for a special order." },
         { q: "Overrolled or Underrolled", a: "Use the Roll drop-down to choose OR (overrolled) or UR (underrolled) for each blind." },
+        { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these (Linked and Linked + E6 take off less; E6 Motor takes off more), and the cut list updates automatically. A special window is marked with a small purple \u201CS\u201D." },
         { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
         { q: "Labels", a: "The Labels tab prints stick-on labels for each blind, two to a row." }
@@ -2977,12 +3019,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var rows = ws.map(function (w, i) {
       var spring = needsSpringAssist(w) ? "Spring Assist" : "";
       return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") +
-        '</td><td class="pshade">' + mm(tubeLength(w.faceRec, w.width)) +
+        '</td><td class="pshade">' + mm(windowTubeLength(w)) +
         '</td><td>' + esc(fabricSummary(w) || "") +
-        '</td><td class="pshade">' + mm(clothWidth(w.faceRec, w.width)) +
+        '</td><td class="pshade">' + mm(windowClothWidth(w)) +
         '</td><td class="pshade">' + mm(windowClothDrop(w)) +
         '</td><td>' + esc(baserailSummary(w) || "") +
-        '</td><td class="pshade">' + mm(baserail(w.faceRec, w.width)) +
+        '</td><td class="pshade">' + mm(windowBaserail(w)) +
         '</td><td class="p-spring">' + spring + '</td></tr>';
     }).join("");
     doPrint('<div class="p-cut"><div class="p-head"><h2>Cloth Cut List</h2><div class="p-meta"><div><b>' + esc(job.jobName || "") + '</b></div><div>' +
@@ -3454,6 +3496,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (a === "newjob") newJob();
       else if (a === "newclient") newClient();
       else if (a === "addwin") { var jb = getJob(state.jobId); if (jb.windows.length < MAX_WINDOWS) { jb.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "" }); saveWindows(jb); render(); } }
+      else if (a === "addspecialwin") { var jbs = getJob(state.jobId); if (jbs.windows.length < MAX_WINDOWS) { jbs.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "", special: true, specialType: "linked" }); saveWindows(jbs); render(); } }
       else if (a === "addon-add") { var ja = getJob(state.jobId); if (!Array.isArray(ja.addons)) ja.addons = []; ja.addons.push({ id: "", qty: 1, target: "job", cat: t.getAttribute("data-cat") || "Blind hardware" }); saveAddons(ja); render(); }
       else if (a === "clientview") { state.clientView = t.checked; render(); }
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
@@ -3644,6 +3687,16 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.hasAttribute("data-job-client")) { job.clientId = el.value || null; queueJobPatch(job.id, "client_id", job.clientId); render(); }
     else if (el.getAttribute("data-job-field") === "status") { job.status = el.value; queueJobPatch(job.id, "status", el.value); render(); }
     else if (el.getAttribute("data-job-field") === "dateReceived") { job.dateReceived = el.value; queueJobPatch(job.id, "date_received", el.value); render(); }
+    else if (el.hasAttribute("data-win") && el.hasAttribute("data-sptype")) {
+      var ws = job.windows.filter(function (x) { return x.id === el.getAttribute("data-win"); })[0];
+      if (ws) {
+        /* pick-one: always set to the tapped type (a special window must have one) */
+        ws.specialType = el.getAttribute("data-sptype");
+        ws.special = true;
+        saveWindows(job); render();
+      }
+      return;
+    }
     else if (el.hasAttribute("data-win")) {
       var wf = el.getAttribute("data-wf");
       var w = job.windows.filter(function (x) { return x.id === el.getAttribute("data-win"); })[0];
