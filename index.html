@@ -975,17 +975,24 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     return { linked: "Linked", e6: "E6 Motor", linked_e6: "Linked + E6 Motor" }[w.specialType] || "Special";
   }
   function clothDrop(d) { d = num(d); return d === null ? null : d + 250; }
-  /* LF / Sheer fabrics need extra length: cloth drop = drop + 400 instead of + 250.
-     One-off (custom-typed) fabrics always use the standard + 250. */
+  /* Some things need extra length on the cloth drop: +400 instead of the standard +250.
+     Triggers: an LF / Sheer fabric, OR the "Lathe (No. 1 Pocket)" baserail.
+     They don't stack — 400 is the maximum either way (for now).
+     One-off (custom-typed) fabrics always use the standard + 250 for the fabric side. */
+  var DROP_EXTRA_BASERAILS = { "Lathe (No. 1 Pocket)": true };
   function isLfSheer(w) {
     if (!w || w.fabricCustom) return false;
     var f = fabricSettings.fabrics.filter(function (x) { return x.name === w.fabric; })[0];
     return !!(f && f.lfSheer);
   }
+  function baserailNeedsExtraDrop(w) {
+    return !!(w && w.baserail && DROP_EXTRA_BASERAILS[w.baserail]);
+  }
   function windowClothDrop(w) {
     var d = num(w.drop);
     if (d === null) return null;
-    return d + (isLfSheer(w) ? 400 : 250);
+    var extra = (isLfSheer(w) || baserailNeedsExtraDrop(w)) ? 400 : 250;
+    return d + extra;
   }
   function tubeLength(fr, w) { return clothWidth(fr, w); }
   function baserail(fr, w) { var cw = clothWidth(fr, w); return cw === null ? null : cw + 2; }
@@ -1992,7 +1999,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
-      '<div class="ruleline">Cloth width: Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 (LF / Sheer fabrics: + 400) · Tube = cloth width · Baserail = cloth width + 2 · Spring Assist when ordered width × drop is over ' + SPRING_ASSIST_AREA + ' m²</div>';
+      '<div class="ruleline">Cloth width: Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 (LF / Sheer fabrics or Lathe (No. 1 Pocket) baserail: + 400) · Tube = cloth width · Baserail = cloth width + 2 · Spring Assist when ordered width × drop is over ' + SPRING_ASSIST_AREA + ' m²</div>';
   }
   function labelsTab(job) {
     var ws = activeWindows(job);
@@ -2584,7 +2591,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "A one-off fabric that isn't in the list", a: "Tick the \u201Cone-off\u201D box on that window and the fabric and colour boxes become free text, so you can type anything for a special order." },
         { q: "Overrolled or Underrolled", a: "Use the Roll drop-down to choose OR (overrolled) or UR (underrolled) for each blind." },
         { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these, and the cut list updates automatically. IMPORTANT: these options only set the cut size \u2014 the hardware itself must still be added in the Add-ons section below (a linking bracket for Linked, the motor for E6, both for Linked + E6). A reminder shows on the window, and the type is shown on the cut list and the pricing so it can be checked at invoicing. A special window is marked with a small purple \u201CS\u201D." },
-        { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
+        { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
         { q: "Labels", a: "The Labels tab prints stick-on labels for each blind, two to a row." }
       ]
