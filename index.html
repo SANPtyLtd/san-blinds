@@ -34,7 +34,7 @@ button{font-family:inherit}
 .topactions{margin-left:auto;display:flex;gap:8px}
 
 /* layout */
-.wrap{max-width:1180px;margin:0 auto;padding:26px 22px 60px}
+.wrap{max-width:1360px;margin:0 auto;padding:26px 22px 60px}
 .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
 h1{font-size:26px;margin:0;letter-spacing:-.3px;color:var(--ink)}
 .sub{margin:4px 0 0;color:var(--dim);font-size:14px}
@@ -431,12 +431,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 @media print{ .p-quote .pt-sub td{border-top:1px solid #999} .p-quote .pt-tot td{border-top:2px solid #000;font-weight:700;font-size:14px} }
 /* wider window entry table + horizontal scroll on narrow screens */
 .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.winentry{min-width:1080px}
+.winentry{min-width:1240px}
 .winentry th,.winentry td{padding:6px 7px}
 .winentry .fabsel,.winentry .rollsel,.winentry .fabtext,.winentry .frsel{width:100%;min-width:96px;box-sizing:border-box;
   border:1px solid var(--line);background:#fff;padding:8px 8px;border-radius:7px;font-family:inherit;font-size:14px}
 .winentry .rollsel{min-width:64px}
-.winentry input.narrow{max-width:82px}
+.winentry input.narrow{width:74px;min-width:74px;text-align:center;padding-left:6px;padding-right:6px}
 .winentry .oneoffcell{text-align:center}
 .sptag{display:inline-block;margin-left:5px;font-size:10px;font-weight:800;color:#fff;background:#7a5bc0;border-radius:4px;padding:1px 5px;vertical-align:middle}
 .specialrow td{background:#faf8ff}
@@ -444,6 +444,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .spbox{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--dim);white-space:nowrap;cursor:pointer;line-height:1.2}
 .spbox.on{color:#5b3ba8;font-weight:700}
 .spbox input{margin:0}
+.e6note{margin-top:4px;font-size:10.5px;font-weight:700;color:#8a5a05;background:#fff2d6;border-radius:6px;padding:3px 7px;line-height:1.3;max-width:150px}
+.spcell{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#efe7fb;color:#5b3ba8}
+.cut tr.specialrow td{background:#faf8ff}
+.cut tr.specialrow td.shade{background:#f1ecfa}
 .oneoff{display:inline-flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;color:var(--dim);cursor:pointer;line-height:1}
 .oneoff input{margin:0}
 /* Fabrics management tab */
@@ -964,6 +968,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function windowTubeLength(w) { return windowClothWidth(w); }
   function windowBaserail(w) { var cw = windowClothWidth(w); return cw === null ? null : cw + 2; }
+  /* Human label for a special window's type, for the cut list. */
+  function specialLabel(w) {
+    if (!w || !w.special) return "";
+    return { linked: "Linked", e6: "E6 Motor", linked_e6: "Linked + E6 Motor" }[w.specialType] || "Special";
+  }
   function clothDrop(d) { d = num(d); return d === null ? null : d + 250; }
   /* LF / Sheer fabrics need extra length: cloth drop = drop + 400 instead of + 250.
      One-off (custom-typed) fabrics always use the standard + 250. */
@@ -1731,7 +1740,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         function sbox(val, label) {
           return '<label class="spbox' + (st === val ? " on" : "") + '"><input type="checkbox" data-win="' + w.id + '" data-sptype="' + val + '" ' + (st === val ? "checked" : "") + '><span>' + label + '</span></label>';
         }
-        specialCell = '<div class="spopts">' + sbox("linked", "Linked") + sbox("e6", "E6 Motor") + sbox("linked_e6", "Linked + E6") + '</div>';
+        specialCell = '<div class="spopts">' + sbox("linked", "Linked") + sbox("e6", "E6 Motor") + sbox("linked_e6", "Linked + E6") +
+          ((st === "e6" || st === "linked_e6") ? '<div class="e6note" title="The E6 Motor option only sets the cloth cut size. Add the actual motor as an item in the Add-ons section below.">\u26A0 Add the motor in Add-ons below</div>' : "") +
+          '</div>';
       } else {
         specialCell = '<span class="dim">—</span>';
       }
@@ -1958,7 +1969,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var rows = ws.map(function (w, i) {
       var cw = windowClothWidth(w);
       var spring = needsSpringAssist(w) ? '<span class="springyes">Spring Assist</span>' : '<span class="dim">—</span>';
-      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") +
+      var sp = w.special ? '<span class="spcell">' + esc(specialLabel(w)) + '</span>' : '<span class="dim">—</span>';
+      return '<tr' + (w.special ? ' class="specialrow"' : '') + '><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") +
+        '</td><td>' + sp +
         '</td><td class="mono shade">' + mm(windowTubeLength(w)) +
         '</td><td>' + esc(fabricSummary(w) || "—") +
         '</td><td class="mono shade strong">' + mm(cw) +
@@ -1967,7 +1980,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '</td><td class="mono shade">' + mm(windowBaserail(w)) +
         '</td><td>' + spring + '</td></tr>';
     }).join("");
-    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th class="shade">Tube length</th><th>Fabric / colour</th><th class="shade">Cloth width</th><th class="shade">Cloth drop</th><th>Baserail type / colour</th><th class="shade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th>Special</th><th class="shade">Tube length</th><th>Fabric / colour</th><th class="shade">Cloth width</th><th class="shade">Cloth drop</th><th>Baserail type / colour</th><th class="shade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
@@ -3019,6 +3032,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var rows = ws.map(function (w, i) {
       var spring = needsSpringAssist(w) ? "Spring Assist" : "";
       return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") +
+        '</td><td>' + esc(specialLabel(w)) +
         '</td><td class="pshade">' + mm(windowTubeLength(w)) +
         '</td><td>' + esc(fabricSummary(w) || "") +
         '</td><td class="pshade">' + mm(windowClothWidth(w)) +
@@ -3029,7 +3043,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }).join("");
     doPrint('<div class="p-cut"><div class="p-head"><h2>Cloth Cut List</h2><div class="p-meta"><div><b>' + esc(job.jobName || "") + '</b></div><div>' +
       esc(client ? client.name : "") + ' · ' + esc(job.sanRef || "") + ' · ' + esc(job.clientRef || "") + '</div><div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
-      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th class="pshade">Tube length</th><th>Fabric / colour</th><th class="pshade">Cloth width</th><th class="pshade">Cloth drop</th><th>Baserail type / colour</th><th class="pshade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Special</th><th class="pshade">Tube length</th><th>Fabric / colour</th><th class="pshade">Cloth width</th><th class="pshade">Cloth drop</th><th>Baserail type / colour</th><th class="pshade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
   }
   function printLabels(job) {
     var ws = activeWindows(job), cells = [];
@@ -3691,9 +3705,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var ws = job.windows.filter(function (x) { return x.id === el.getAttribute("data-win"); })[0];
       if (ws) {
         /* pick-one: always set to the tapped type (a special window must have one) */
-        ws.specialType = el.getAttribute("data-sptype");
+        var newType = el.getAttribute("data-sptype");
+        var wasE6 = ws.specialType === "e6" || ws.specialType === "linked_e6";
+        ws.specialType = newType;
         ws.special = true;
         saveWindows(job); render();
+        /* remind staff that the special option only changes the cut size \u2014 the motor
+           itself still needs adding in the Add-ons section below. */
+        var nowE6 = newType === "e6" || newType === "linked_e6";
+        if (nowE6 && !wasE6) toast("E6 Motor sets the cut size only \u2014 remember to add the motor in the Add-ons section below.");
       }
       return;
     }
