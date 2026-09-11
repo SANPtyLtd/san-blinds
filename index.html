@@ -396,6 +396,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 }
 .pricegrid .ralign{text-align:right}
 .pricegrid .pgtag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px}
+.pricegrid .sptagp{background:#efe7fb;color:#5b3ba8}
 .hwcattag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px;text-transform:none;letter-spacing:0}
 .spectag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:#e5dcf7;color:#5b3ba8;margin-left:3px}
 .pricegrid tr.aohdr td{background:#f5f8fa;padding-top:9px;font-size:13px}
@@ -1740,9 +1741,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         function sbox(val, label) {
           return '<label class="spbox' + (st === val ? " on" : "") + '"><input type="checkbox" data-win="' + w.id + '" data-sptype="' + val + '" ' + (st === val ? "checked" : "") + '><span>' + label + '</span></label>';
         }
+        var reminders = [];
+        if (st === "linked" || st === "linked_e6") reminders.push("a linking bracket");
+        if (st === "e6" || st === "linked_e6") reminders.push("the motor");
+        var reminderNote = reminders.length
+          ? '<div class="e6note" title="These options only set the cloth cut size. The hardware itself still needs adding as an item in the Add-ons section below.">\u26A0 Add ' + reminders.join(" &amp; ") + ' in Add-ons below</div>'
+          : "";
         specialCell = '<div class="spopts">' + sbox("linked", "Linked") + sbox("e6", "E6 Motor") + sbox("linked_e6", "Linked + E6") +
-          ((st === "e6" || st === "linked_e6") ? '<div class="e6note" title="The E6 Motor option only sets the cloth cut size. Add the actual motor as an item in the Add-ons section below.">\u26A0 Add the motor in Add-ons below</div>' : "") +
-          '</div>';
+          reminderNote + '</div>';
       } else {
         specialCell = '<span class="dim">—</span>';
       }
@@ -1846,7 +1852,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       }
       var lineGst = p.blindNet * pr.gstRate;
       var springMark = p.spring ? ' <span class="springmark" title="Oversize — Spring Assist required (see below)">\u2295</span>' : "";
-      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + '</td>' +
+      var spMark = w.special ? ' <span class="pgtag sptagp">' + esc(specialLabel(w)) + '</span>' : "";
+      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + spMark + '</td>' +
         '<td>' + esc(fabricSummary(w) || "—") + ' <span class="pgtag">' + esc(p.group) + '</span></td>' +
         '<td class="mono">' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="mono ralign">' + money(p.base) + '</td>' +
@@ -1919,7 +1926,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       }
       var lineGst = p.blindNet * pr.gstRate;
       var springMark = p.spring ? ' \u2295' : "";
-      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + '</td>' +
+      var spMark = w.special ? ' [' + esc(specialLabel(w)) + ']' : "";
+      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + spMark + '</td>' +
         '<td>' + esc(fabricSummary(w)) + ' (' + esc(p.group) + ')</td>' +
         '<td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="ra">' + money(p.base) + '</td><td class="ra">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
@@ -2575,7 +2583,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Choosing fabric and colour", a: "Pick the fabric from the drop-down, then the colour box shows only that fabric's colours. Do the same for the baserail. These come from the Fabrics tab \u2014 if something's missing, it needs adding there." },
         { q: "A one-off fabric that isn't in the list", a: "Tick the \u201Cone-off\u201D box on that window and the fabric and colour boxes become free text, so you can type anything for a special order." },
         { q: "Overrolled or Underrolled", a: "Use the Roll drop-down to choose OR (overrolled) or UR (underrolled) for each blind." },
-        { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these (Linked and Linked + E6 take off less; E6 Motor takes off more), and the cut list updates automatically. A special window is marked with a small purple \u201CS\u201D." },
+        { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these, and the cut list updates automatically. IMPORTANT: these options only set the cut size \u2014 the hardware itself must still be added in the Add-ons section below (a linking bracket for Linked, the motor for E6, both for Linked + E6). A reminder shows on the window, and the type is shown on the cut list and the pricing so it can be checked at invoicing. A special window is marked with a small purple \u201CS\u201D." },
         { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
         { q: "Labels", a: "The Labels tab prints stick-on labels for each blind, two to a row." }
@@ -3706,14 +3714,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (ws) {
         /* pick-one: always set to the tapped type (a special window must have one) */
         var newType = el.getAttribute("data-sptype");
-        var wasE6 = ws.specialType === "e6" || ws.specialType === "linked_e6";
+        var oldType = ws.specialType;
         ws.specialType = newType;
         ws.special = true;
         saveWindows(job); render();
-        /* remind staff that the special option only changes the cut size \u2014 the motor
+        /* remind staff that the special option only changes the cut size — the hardware
            itself still needs adding in the Add-ons section below. */
-        var nowE6 = newType === "e6" || newType === "linked_e6";
-        if (nowE6 && !wasE6) toast("E6 Motor sets the cut size only \u2014 remember to add the motor in the Add-ons section below.");
+        if (newType !== oldType) {
+          var need = [];
+          if (newType === "linked" || newType === "linked_e6") need.push("a linking bracket");
+          if (newType === "e6" || newType === "linked_e6") need.push("the motor");
+          if (need.length) toast("This sets the cut size only — remember to add " + need.join(" & ") + " in the Add-ons section below.");
+        }
       }
       return;
     }
