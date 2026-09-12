@@ -468,7 +468,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 @media print{
   body.printing .lbl-lg,body.printing .lbl-sm{border:none!important;border-radius:0!important;page-break-inside:avoid;break-inside:avoid}
   body.printing .lbl-order .lbl-frame{border:2pt solid #000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body.printing #printRoot .lblsheet{page-break-after:always}
+  body.printing #printRoot .lblsheet{page-break-after:avoid}
+  body.printing #printRoot .lblsheet > *:last-child{page-break-after:avoid;break-after:avoid}
 }
 /* wider window entry table + horizontal scroll on narrow screens */
 .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -2115,13 +2116,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   var LARGE_PAGE_CSS =
     "@media print{@page{size:A4;margin:0}" +
     "#printRoot .lblsheet{display:grid;grid-template-columns:99.1mm 99.1mm;grid-auto-rows:67.7mm;" +
-    "column-gap:2.5mm;padding:12.9mm 4.65mm;box-sizing:border-box}" +
+    "column-gap:2.5mm;padding:12.7mm 4.65mm 0;box-sizing:border-box}" +
     "#printRoot .lbl-lg{width:99.1mm;height:67.7mm}}";
   /* Avery L7651 (21-up, 63.5x38.1): 3 cols x 7 rows, top 15.15mm, sides 7.75mm, col gap 2.5mm. */
   var SMALL_PAGE_CSS =
     "@media print{@page{size:A4;margin:0}" +
     "#printRoot .lblsheet{display:grid;grid-template-columns:63.5mm 63.5mm 63.5mm;grid-auto-rows:38.1mm;" +
-    "column-gap:2.5mm;padding:15.15mm 7.75mm;box-sizing:border-box}" +
+    "column-gap:2.5mm;padding:15mm 7.75mm 0;box-sizing:border-box}" +
     "#printRoot .lbl-sm{width:63.5mm;height:38.1mm}}";
   function printBlindLabels(job) {
     var ws = activeWindows(job), client = getClient(job.clientId), cn = client ? client.name : "";
