@@ -441,8 +441,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .lbl-client{font-weight:700;font-size:13pt}
 .lbl-ref{font-weight:700;font-size:12pt}
 .lbl-job{font-size:11pt;margin-top:1mm}
+.lbl-job.big{font-size:15pt;font-weight:700;margin-top:1.5mm}
+.lbl-job.xbig{font-size:22pt;font-weight:800;margin-top:2mm;line-height:1.1}
 .lbl-addr{font-size:10pt;color:#333;margin-top:.5mm}
+.lbl-addr.big{font-size:15pt;font-weight:600;color:#000;margin-top:1.5mm;line-height:1.15}
 .lbl-win{font-weight:700;font-size:12pt;margin-top:2mm}
+.lbl-win.big{font-size:17pt;font-weight:800;margin-top:2.5mm}
+.lbl-order{border:2.5pt solid #000;box-sizing:border-box}
+.lbl-order .lbl-count{font-size:16pt}
 .lbl-size{font-size:11pt;margin-top:.5mm}
 .lbl-roll{font-size:11pt;font-weight:700;margin-top:.5mm}
 .lbl-count{font-weight:700;font-size:15pt;margin-top:3mm}
@@ -457,6 +463,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .lbl-foot.sm{font-size:6.5pt;bottom:2mm;left:4mm;right:4mm}
 @media print{
   body.printing .lbl-lg,body.printing .lbl-sm{border:none!important;border-radius:0!important;page-break-inside:avoid;break-inside:avoid}
+  body.printing .lbl-order{border:2.5pt solid #000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body.printing #printRoot .lblsheet{page-break-after:always}
 }
 /* wider window entry table + horizontal scroll on narrow screens */
@@ -2045,12 +2052,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var n = ws.length;
     return '<div class="card pad"><div class="cardbar"><div><b>Labels</b> <span class="dim">— ' + esc(clientName) + ' · ' + esc(job.jobName || "") + '</span></div></div>' +
       '<div class="lblbtns">' +
-      '<button class="btn primary" data-action="print-blind-labels">Print blind labels <span class="dim">(' + n + ' \u00D7 large)</span></button>' +
+      '<button class="btn primary" data-action="print-blind-labels">Print blind labels <span class="dim">(order label + ' + n + ' blind' + (n === 1 ? "" : "s") + ')</span></button>' +
       '<button class="btn primary" data-action="print-tube-labels">Print tube labels <span class="dim">(' + n + ' \u00D7 small)</span></button>' +
-      '<button class="btn primary" data-action="print-order-label">Print order label <span class="dim">(1 \u00D7 large)</span></button>' +
       '</div>' +
-      '<p class="hint">Blind &amp; order labels print on <b>Avery L7565</b> sheets (8 per A4, 99.1 \u00D7 67.7mm). Tube labels print on <b>Avery L7651</b> sheets (21 per A4, 63.5 \u00D7 38.1mm). Set your printer to <b>Actual size / 100%</b> (not \u201Cfit to page\u201D) so they line up.</p>' +
-      '<div class="lblpreview"><div class="lblprev-head">Preview \u2014 blind label</div>' + blindLabelHTML(job, ws[0], 0, clientName, n) + '</div>';
+      '<p class="hint">The large sheet prints the <b>order label first</b>, then one label per blind, on <b>Avery L7565</b> sheets (8 per A4, 99.1 \u00D7 67.7mm). Tube labels print on <b>Avery L7651</b> sheets (21 per A4, 63.5 \u00D7 38.1mm). Set your printer to <b>Actual size / 100%</b> (not \u201Cfit to page\u201D) so they line up.</p>' +
+      '<div class="lblpreview"><div class="lblprev-head">Preview \u2014 order label (prints first)</div>' + orderLabelHTML(job, clientName, n) +
+      '<div class="lblprev-head" style="margin-top:14px">Preview \u2014 blind label</div>' + blindLabelHTML(job, ws[0], 0, clientName, n) + '</div>';
   }
   function coFootLine() { return COMPANY.name + " | 55 Lampton Ave, Derwent Park"; }
   /* ---- Blind label (large, one per blind) ---- */
@@ -2059,9 +2066,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var roll = w.roll === "OR" ? "Overrolled" : w.roll === "UR" ? "Underrolled" : "";
     return '<div class="lbl lbl-lg">' +
       '<div class="lbl-row1"><span class="lbl-client">' + esc(clientName) + '</span><span class="lbl-ref mono">' + esc(job.sanRef || "") + '</span></div>' +
-      '<div class="lbl-job">' + esc(job.jobName || "") + '</div>' +
+      '<div class="lbl-job big">' + esc(job.jobName || "") + '</div>' +
       '<div class="lbl-addr">' + esc(job.jobAddress || "") + '</div>' +
-      '<div class="lbl-win">' + esc(w.name || ("Window " + (i + 1))) + '</div>' +
+      '<div class="lbl-win big">' + esc(w.name || ("Window " + (i + 1))) + '</div>' +
       '<div class="lbl-size mono">' + esc(w.width || "") + ' x ' + esc(w.drop || "") + 'mm drop' + hand + '</div>' +
       (roll ? '<div class="lbl-roll">' + roll + '</div>' : '') +
       '<div class="lbl-foot">' + esc(coFootLine()) + '</div>' +
@@ -2077,12 +2084,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div class="lbl-foot sm">' + esc(coFootLine()) + '</div>' +
       '</div>';
   }
-  /* ---- Order label (large, one per order) ---- */
+  /* ---- Order label (large, one per order — visually distinct, prints first) ---- */
   function orderLabelHTML(job, clientName, total) {
-    return '<div class="lbl lbl-lg">' +
+    return '<div class="lbl lbl-lg lbl-order">' +
       '<div class="lbl-row1"><span class="lbl-client">' + esc(clientName) + '</span><span class="lbl-ref mono">' + esc(job.sanRef || "") + '</span></div>' +
-      '<div class="lbl-job">' + esc(job.jobName || "") + '</div>' +
-      '<div class="lbl-addr">' + esc(job.jobAddress || "") + '</div>' +
+      '<div class="lbl-job xbig">' + esc(job.jobName || "") + '</div>' +
+      '<div class="lbl-addr big">' + esc(job.jobAddress || "") + '</div>' +
       '<div class="lbl-count">' + total + ' x Blind' + (total === 1 ? "" : "s") + '</div>' +
       '<div class="lbl-foot">' + esc(coFootLine()) + '</div>' +
       '</div>';
@@ -2101,17 +2108,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     "#printRoot .lbl-sm{width:63.5mm;height:38.1mm}}";
   function printBlindLabels(job) {
     var ws = activeWindows(job), client = getClient(job.clientId), cn = client ? client.name : "";
-    var cells = ws.map(function (w, i) { return blindLabelHTML(job, w, i, cn, ws.length); }).join("");
+    /* order label first, then one label per blind — all on the one large sheet */
+    var cells = orderLabelHTML(job, cn, ws.length) +
+      ws.map(function (w, i) { return blindLabelHTML(job, w, i, cn, ws.length); }).join("");
     doPrint('<div class="lblsheet">' + cells + '</div>', LARGE_PAGE_CSS);
   }
   function printTubeLabels(job) {
     var ws = activeWindows(job), client = getClient(job.clientId), cn = client ? client.name : "";
     var cells = ws.map(function (w, i) { return tubeLabelHTML(job, w, i, cn); }).join("");
     doPrint('<div class="lblsheet">' + cells + '</div>', SMALL_PAGE_CSS);
-  }
-  function printOrderLabel(job) {
-    var client = getClient(job.clientId), cn = client ? client.name : "";
-    doPrint('<div class="lblsheet">' + orderLabelHTML(job, cn, activeWindows(job).length) + '</div>', LARGE_PAGE_CSS);
   }
 
 
@@ -2688,7 +2693,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these, and the cut list updates automatically. IMPORTANT: these options only set the cut size \u2014 the hardware itself must still be added in the Add-ons section below (a linking bracket for Linked, the motor for E6, both for Linked + E6). A reminder shows on the window, and the type is shown on the cut list and the pricing so it can be checked at invoicing. A special window is marked with a small purple \u201CS\u201D." },
         { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
-        { q: "Labels", a: "The Labels tab has three buttons. \u201CPrint blind labels\u201D makes one large label per blind (job, window, size, hand, roll). \u201CPrint tube labels\u201D makes one small label per blind (with the tube length). \u201CPrint order label\u201D makes one large label for the whole order (with the blind count). Blind & order labels use Avery L7565 sheets (8 per A4); tube labels use Avery L7651 sheets (21 per A4). IMPORTANT: in the print dialog set scale to \u201CActual size\u201D or 100% (not \u201Cfit to page\u201D) so the labels line up with the template. The \u201CHand\u201D (LH / RH) shown on the blind label comes from the Hand column on the Windows tab." }
+        { q: "Labels", a: "The Labels tab has two buttons. \u201CPrint blind labels\u201D makes one large sheet with the ORDER label first (bordered, with a large job name and address so blinds are easy to find on the shelf), then one label per blind. \u201CPrint tube labels\u201D makes one small label per blind with the tube length. Blind labels use Avery L7565 (8 per A4); tube labels use Avery L7651 (21 per A4). IMPORTANT: set the print scale to Actual size / 100% (not fit to page) so labels line up. The Hand (LH / RH) on the blind label comes from the Hand column on the Windows tab." }
       ]
     },
     {
@@ -3627,7 +3632,6 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "print-pricing") printPricing(getJob(state.jobId));
       else if (a === "print-blind-labels") printBlindLabels(getJob(state.jobId));
       else if (a === "print-tube-labels") printTubeLabels(getJob(state.jobId));
-      else if (a === "print-order-label") printOrderLabel(getJob(state.jobId));
       else if (a === "addholiday") addHoliday();
       else if (a === "fabrics-save") saveFabricsDraft();
       else if (a === "fabrics-undo") { fabricDraft = null; render(); }
