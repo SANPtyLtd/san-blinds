@@ -430,9 +430,38 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .pricegrid .ttot td{border-top:2px solid var(--ink);font-size:16px;font-weight:700;padding-top:8px}
 .pxwarn{background:#fff8e8;border:1px solid #e6c88a;color:#8a5a05;border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:13.5px}
 @media print{ .p-quote .pt-sub td{border-top:1px solid #999} .p-quote .pt-tot td{border-top:2px solid #000;font-weight:700;font-size:14px} }
+/* ---- Labels ---- */
+.lblbtns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.lblpreview{margin-top:14px}
+.lblprev-head{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:700;margin-bottom:6px}
+.lbl{box-sizing:border-box;overflow:hidden;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif}
+.lbl-lg{width:99.1mm;height:67.7mm;padding:5mm 6mm;border:1px dashed #c9d2da;border-radius:4px}
+.lbl-sm{width:63.5mm;height:38.1mm;padding:3mm 4mm;border:1px dashed #c9d2da;border-radius:4px}
+.lbl-row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.lbl-client{font-weight:700;font-size:13pt}
+.lbl-ref{font-weight:700;font-size:12pt}
+.lbl-job{font-size:11pt;margin-top:1mm}
+.lbl-addr{font-size:10pt;color:#333;margin-top:.5mm}
+.lbl-win{font-weight:700;font-size:12pt;margin-top:2mm}
+.lbl-size{font-size:11pt;margin-top:.5mm}
+.lbl-roll{font-size:11pt;font-weight:700;margin-top:.5mm}
+.lbl-count{font-weight:700;font-size:15pt;margin-top:3mm}
+.lbl-foot{font-size:7.5pt;color:#444;position:absolute;bottom:3mm;left:6mm;right:6mm}
+.lbl-lg{position:relative}
+.lbl-sm{position:relative}
+.lbl-date{font-size:9pt}
+.lbl-sm .lbl-ref{font-size:10pt}
+.lbl-client2{font-weight:700;font-size:11pt;margin-top:1mm}
+.lbl-job2{font-size:9.5pt;margin-top:.3mm}
+.lbl-tube{font-size:11pt;font-weight:700;margin-top:1.5mm}
+.lbl-foot.sm{font-size:6.5pt;bottom:2mm;left:4mm;right:4mm}
+@media print{
+  body.printing .lbl-lg,body.printing .lbl-sm{border:none!important;border-radius:0!important;page-break-inside:avoid;break-inside:avoid}
+  body.printing #printRoot .lblsheet{page-break-after:always}
+}
 /* wider window entry table + horizontal scroll on narrow screens */
 .tablescroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.winentry{min-width:1240px}
+.winentry{min-width:1320px}
 .winentry th,.winentry td{padding:6px 7px}
 .winentry .fabsel,.winentry .rollsel,.winentry .fabtext,.winentry .frsel{width:100%;min-width:96px;box-sizing:border-box;
   border:1px solid var(--line);background:#fff;padding:8px 8px;border-radius:7px;font-family:inherit;font-size:14px}
@@ -1741,6 +1770,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       // roll direction
       var rollOpts = '<option value="">—</option>' + ["OR", "UR"].map(function (o) { return opt(o, w.roll); }).join("");
       var rollCell = '<select class="rollsel" data-win="' + w.id + '" data-wf="roll">' + rollOpts + '</select>';
+      // hand (left / right)
+      var handOpts = '<option value="">—</option>' + ["LH", "RH"].map(function (o) { return opt(o, w.hand); }).join("");
+      var handCell = '<select class="rollsel" data-win="' + w.id + '" data-wf="hand">' + handOpts + '</select>';
       // special-window options (pick one): Linked / E6 Motor / Linked + E6 Motor
       var specialCell;
       if (w.special) {
@@ -1771,11 +1803,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '<td>' + baserailCell + '</td>' +
         '<td>' + baserailColourCell + '</td>' +
         '<td>' + rollCell + '</td>' +
+        '<td>' + handCell + '</td>' +
         '<td>' + specialCell + '</td>' +
         '<td class="rowact"><button class="btn small danger-ghost" data-del-win="' + w.id + '">✕</button></td></tr>';
     }).join("");
     var canAdd = job.windows.length < MAX_WINDOWS;
-    return '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th>Special</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    return '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th>Hand</th><th>Special</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="entryfoot"><div class="addbtns"><button class="btn ' + (canAdd ? "primary" : "disabled") + '" data-action="addwin" ' + (canAdd ? "" : "disabled") + '>+ Add window</button>' +
       '<button class="btn ' + (canAdd ? "" : "disabled") + '" data-action="addspecialwin" ' + (canAdd ? "" : "disabled") + '>+ Add Special Window</button></div>' +
       '<span class="count">' + job.windows.length + ' / ' + MAX_WINDOWS + ' windows</span></div></div>' +
@@ -2003,20 +2036,82 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function labelsTab(job) {
     var ws = activeWindows(job);
-    var content = ws.length ? '<div class="labelprev">' + ws.map(function (w, i) { return labelHTML(job, w, i); }).join("") + '</div>'
-      : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
-    return '<div class="card pad"><div class="cardbar"><div><b>Labels</b> <span class="dim">— two copies per window</span></div>' +
-      (ws.length ? '<button class="btn primary" data-action="print-labels">Print labels</button>' : "") + '</div>' + content + '</div>';
+    var client = getClient(job.clientId);
+    var clientName = client ? client.name : "";
+    if (!ws.length) {
+      return '<div class="card pad"><div class="cardbar"><div><b>Labels</b></div></div>' +
+        '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div></div>';
+    }
+    var n = ws.length;
+    return '<div class="card pad"><div class="cardbar"><div><b>Labels</b> <span class="dim">— ' + esc(clientName) + ' · ' + esc(job.jobName || "") + '</span></div></div>' +
+      '<div class="lblbtns">' +
+      '<button class="btn primary" data-action="print-blind-labels">Print blind labels <span class="dim">(' + n + ' \u00D7 large)</span></button>' +
+      '<button class="btn primary" data-action="print-tube-labels">Print tube labels <span class="dim">(' + n + ' \u00D7 small)</span></button>' +
+      '<button class="btn primary" data-action="print-order-label">Print order label <span class="dim">(1 \u00D7 large)</span></button>' +
+      '</div>' +
+      '<p class="hint">Blind &amp; order labels print on <b>Avery L7565</b> sheets (8 per A4, 99.1 \u00D7 67.7mm). Tube labels print on <b>Avery L7651</b> sheets (21 per A4, 63.5 \u00D7 38.1mm). Set your printer to <b>Actual size / 100%</b> (not \u201Cfit to page\u201D) so they line up.</p>' +
+      '<div class="lblpreview"><div class="lblprev-head">Preview \u2014 blind label</div>' + blindLabelHTML(job, ws[0], 0, clientName, n) + '</div>';
   }
-  function labelHTML(job, w, i) {
-    var cw = windowClothWidth(w);
-    return '<div class="label"><div class="lb-top"><span class="lb-co">SAN Pty Ltd</span><span class="lb-addr">55 Lampton Ave, Derwent Park</span></div>' +
-      '<div class="lb-ref"><span class="mono">' + esc(job.clientRef || "") + '</span><span>' + esc(job.jobName || "") + '</span></div>' +
-      '<div class="lb-blind"><b>Window ' + (i + 1) + '</b><span>' + esc(w.name || "") + '</span></div>' +
-      '<table class="lb-grid"><tr><td>Order size</td><td class="mono">' + mm(num(w.width)) + '</td><td class="mono">' + mm(num(w.drop)) + '</td></tr>' +
-      '<tr><td>Type</td><td colspan="2">' + esc(w.faceRec || "") + '</td></tr>' +
-      '<tr><td>Cloth</td><td class="mono strong">' + mm(cw) + '</td><td class="mono strong">' + mm(windowClothDrop(w)) + '</td></tr>' +
-      '<tr><td>Tube / Baserail</td><td class="mono">' + mm(windowTubeLength(w)) + '</td><td class="mono">' + mm(windowBaserail(w)) + '</td></tr></table></div>';
+  function coFootLine() { return COMPANY.name + " | 55 Lampton Ave, Derwent Park"; }
+  /* ---- Blind label (large, one per blind) ---- */
+  function blindLabelHTML(job, w, i, clientName, total) {
+    var hand = w.hand ? " " + esc(w.hand) : "";
+    var roll = w.roll === "OR" ? "Overrolled" : w.roll === "UR" ? "Underrolled" : "";
+    return '<div class="lbl lbl-lg">' +
+      '<div class="lbl-row1"><span class="lbl-client">' + esc(clientName) + '</span><span class="lbl-ref mono">' + esc(job.sanRef || "") + '</span></div>' +
+      '<div class="lbl-job">' + esc(job.jobName || "") + '</div>' +
+      '<div class="lbl-addr">' + esc(job.jobAddress || "") + '</div>' +
+      '<div class="lbl-win">' + esc(w.name || ("Window " + (i + 1))) + '</div>' +
+      '<div class="lbl-size mono">' + esc(w.width || "") + ' x ' + esc(w.drop || "") + 'mm drop' + hand + '</div>' +
+      (roll ? '<div class="lbl-roll">' + roll + '</div>' : '') +
+      '<div class="lbl-foot">' + esc(coFootLine()) + '</div>' +
+      '</div>';
+  }
+  /* ---- Tube label (small, one per blind) ---- */
+  function tubeLabelHTML(job, w, i, clientName) {
+    return '<div class="lbl lbl-sm">' +
+      '<div class="lbl-row1"><span class="lbl-date">Date: ' + fmtDate(new Date()) + '</span><span class="lbl-ref mono">' + esc(job.sanRef || "") + '</span></div>' +
+      '<div class="lbl-client2">' + esc(clientName) + '</div>' +
+      '<div class="lbl-job2">' + esc(job.jobName || "") + '</div>' +
+      '<div class="lbl-tube mono">Tube Length: ' + mm(windowTubeLength(w)) + '</div>' +
+      '<div class="lbl-foot sm">' + esc(coFootLine()) + '</div>' +
+      '</div>';
+  }
+  /* ---- Order label (large, one per order) ---- */
+  function orderLabelHTML(job, clientName, total) {
+    return '<div class="lbl lbl-lg">' +
+      '<div class="lbl-row1"><span class="lbl-client">' + esc(clientName) + '</span><span class="lbl-ref mono">' + esc(job.sanRef || "") + '</span></div>' +
+      '<div class="lbl-job">' + esc(job.jobName || "") + '</div>' +
+      '<div class="lbl-addr">' + esc(job.jobAddress || "") + '</div>' +
+      '<div class="lbl-count">' + total + ' x Blind' + (total === 1 ? "" : "s") + '</div>' +
+      '<div class="lbl-foot">' + esc(coFootLine()) + '</div>' +
+      '</div>';
+  }
+  /* Avery L7565 (8-up, 99.1x67.7): 2 cols x 4 rows, page margins top/bottom 12.9mm, sides 4.65mm. */
+  var LARGE_PAGE_CSS =
+    "@media print{@page{size:A4;margin:0}" +
+    "#printRoot .lblsheet{display:grid;grid-template-columns:99.1mm 99.1mm;grid-auto-rows:67.7mm;" +
+    "column-gap:2.5mm;padding:12.9mm 4.65mm;box-sizing:border-box}" +
+    "#printRoot .lbl-lg{width:99.1mm;height:67.7mm}}";
+  /* Avery L7651 (21-up, 63.5x38.1): 3 cols x 7 rows, top 15.15mm, sides 7.75mm, col gap 2.5mm. */
+  var SMALL_PAGE_CSS =
+    "@media print{@page{size:A4;margin:0}" +
+    "#printRoot .lblsheet{display:grid;grid-template-columns:63.5mm 63.5mm 63.5mm;grid-auto-rows:38.1mm;" +
+    "column-gap:2.5mm;padding:15.15mm 7.75mm;box-sizing:border-box}" +
+    "#printRoot .lbl-sm{width:63.5mm;height:38.1mm}}";
+  function printBlindLabels(job) {
+    var ws = activeWindows(job), client = getClient(job.clientId), cn = client ? client.name : "";
+    var cells = ws.map(function (w, i) { return blindLabelHTML(job, w, i, cn, ws.length); }).join("");
+    doPrint('<div class="lblsheet">' + cells + '</div>', LARGE_PAGE_CSS);
+  }
+  function printTubeLabels(job) {
+    var ws = activeWindows(job), client = getClient(job.clientId), cn = client ? client.name : "";
+    var cells = ws.map(function (w, i) { return tubeLabelHTML(job, w, i, cn); }).join("");
+    doPrint('<div class="lblsheet">' + cells + '</div>', SMALL_PAGE_CSS);
+  }
+  function printOrderLabel(job) {
+    var client = getClient(job.clientId), cn = client ? client.name : "";
+    doPrint('<div class="lblsheet">' + orderLabelHTML(job, cn, activeWindows(job).length) + '</div>', LARGE_PAGE_CSS);
   }
 
 
@@ -2593,7 +2688,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these, and the cut list updates automatically. IMPORTANT: these options only set the cut size \u2014 the hardware itself must still be added in the Add-ons section below (a linking bracket for Linked, the motor for E6, both for Linked + E6). A reminder shows on the window, and the type is shown on the cut list and the pricing so it can be checked at invoicing. A special window is marked with a small purple \u201CS\u201D." },
         { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
-        { q: "Labels", a: "The Labels tab prints stick-on labels for each blind, two to a row." }
+        { q: "Labels", a: "The Labels tab has three buttons. \u201CPrint blind labels\u201D makes one large label per blind (job, window, size, hand, roll). \u201CPrint tube labels\u201D makes one small label per blind (with the tube length). \u201CPrint order label\u201D makes one large label for the whole order (with the blind count). Blind & order labels use Avery L7565 sheets (8 per A4); tube labels use Avery L7651 sheets (21 per A4). IMPORTANT: in the print dialog set scale to \u201CActual size\u201D or 100% (not \u201Cfit to page\u201D) so the labels line up with the template. The \u201CHand\u201D (LH / RH) shown on the blind label comes from the Hand column on the Windows tab." }
       ]
     },
     {
@@ -3040,7 +3135,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
   /* ---------- printing ---------- */
   function printRoot() { return document.getElementById("printRoot"); }
-  function doPrint(html) { printRoot().innerHTML = html; document.body.classList.add("printing"); window.print(); }
+  function doPrint(html, pageCss) {
+    var extra = document.getElementById("printPageCss");
+    if (!extra) { extra = document.createElement("style"); extra.id = "printPageCss"; document.head.appendChild(extra); }
+    extra.textContent = pageCss || "";
+    printRoot().innerHTML = html; document.body.classList.add("printing"); window.print();
+  }
   window.addEventListener("afterprint", function () { document.body.classList.remove("printing"); printRoot().innerHTML = ""; });
   function printCloth(job) {
     var client = getClient(job.clientId), ws = activeWindows(job);
@@ -3060,12 +3160,6 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       esc(client ? client.name : "") + ' · ' + esc(job.sanRef || "") + ' · ' + esc(job.clientRef || "") + '</div><div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
       '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Special</th><th class="pshade">Tube length</th><th>Fabric / colour</th><th class="pshade">Cloth width</th><th class="pshade">Cloth drop</th><th>Baserail type / colour</th><th class="pshade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
   }
-  function printLabels(job) {
-    var ws = activeWindows(job), cells = [];
-    ws.forEach(function (w, i) { cells.push(labelHTML(job, w, i)); cells.push(labelHTML(job, w, i)); });
-    doPrint('<div class="p-labels">' + cells.join("") + '</div>');
-  }
-
   /* ---------- toast ---------- */
   /* ---------- save status ---------- */
   var saveState = "idle", saveHideT;
@@ -3531,7 +3625,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
       else if (a === "print-pricing") printPricing(getJob(state.jobId));
-      else if (a === "print-labels") printLabels(getJob(state.jobId));
+      else if (a === "print-blind-labels") printBlindLabels(getJob(state.jobId));
+      else if (a === "print-tube-labels") printTubeLabels(getJob(state.jobId));
+      else if (a === "print-order-label") printOrderLabel(getJob(state.jobId));
       else if (a === "addholiday") addHoliday();
       else if (a === "fabrics-save") saveFabricsDraft();
       else if (a === "fabrics-undo") { fabricDraft = null; render(); }
@@ -3756,7 +3852,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         if (w.baserailColour && baserailColours(w.baserail).indexOf(w.baserailColour) === -1) w.baserailColour = "";
         saveWindows(job); render(); return;
       }
-      if (wf === "faceRec" || wf === "fabricColour" || wf === "baserailColour" || wf === "roll") {
+      if (wf === "faceRec" || wf === "fabricColour" || wf === "baserailColour" || wf === "roll" || wf === "hand") {
         w[wf] = el.value; saveWindows(job);
         if (wf === "faceRec") return; /* faceRec affects cut list, but no dropdown depends on it here */
         return;
