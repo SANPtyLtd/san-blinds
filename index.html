@@ -397,6 +397,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .pricegrid .ralign{text-align:right}
 .pricegrid .pgtag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px}
 .pricegrid .sptagp{background:#efe7fb;color:#5b3ba8}
+.pricegrid .lathetag{background:#e2f0e6;color:#1d7a45}
 .hwcattag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:#eef1f4;color:#516072;margin-left:4px;text-transform:none;letter-spacing:0}
 .spectag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:#e5dcf7;color:#5b3ba8;margin-left:3px}
 .pricegrid tr.aohdr td{background:#f5f8fa;padding-top:9px;font-size:13px}
@@ -873,11 +874,17 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var pct = clientDiscountPct(client, fg);
     var base = r.price;
     var discAmt = base * pct / 100;
-    var blindNet = base - discAmt;
+    var afterDisc = base - discAmt;
+    /* Lathe (No. 1 Pocket) baserail adds 25% — applied AFTER the client discount. */
+    var lathePct = baserailSurchargePct(w);
+    var lathe = lathePct > 0;
+    var latheSurcharge = afterDisc * lathePct;
+    var blindNet = afterDisc + latheSurcharge;
     /* Spring assist: a flat, un-discounted add-on for oversize blinds. */
     var spring = needsSpringAssist(w) ? (isFinite(P.springAssist) ? P.springAssist : SPRING_ASSIST_PRICE) : 0;
     var net = blindNet + spring;
     return { priced: true, group: fg, base: base, pct: pct, discount: discAmt,
+             lathe: lathe, latheSurcharge: latheSurcharge,
              blindNet: blindNet, spring: spring, net: net, wBand: r.wBand, dBand: r.dBand };
   }
   /* Whole-job pricing: sum the net lines, then add GST at the end. */
@@ -1016,6 +1023,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
      They don't stack — 400 is the maximum either way (for now).
      One-off (custom-typed) fabrics always use the standard + 250 for the fabric side. */
   var DROP_EXTRA_BASERAILS = { "Lathe (No. 1 Pocket)": true };
+  /* Baserails that add a % surcharge to the blind price (after the client discount). */
+  var BASERAIL_SURCHARGE = { "Lathe (No. 1 Pocket)": 0.25 };
+  function baserailSurchargePct(w) {
+    return (w && w.baserail && BASERAIL_SURCHARGE[w.baserail]) ? BASERAIL_SURCHARGE[w.baserail] : 0;
+  }
   function isLfSheer(w) {
     if (!w || w.fabricCustom) return false;
     var f = fabricSettings.fabrics.filter(function (x) { return x.name === w.fabric; })[0];
@@ -1900,7 +1912,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var lineGst = p.blindNet * pr.gstRate;
       var springMark = p.spring ? ' <span class="springmark" title="Oversize — Spring Assist required (see below)">\u2295</span>' : "";
       var spMark = w.special ? ' <span class="pgtag sptagp">' + esc(specialLabel(w)) + '</span>' : "";
-      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + spMark + '</td>' +
+      var latheMark = p.lathe ? ' <span class="pgtag lathetag" title="Lathe (No. 1 Pocket) baserail — 25% surcharge, applied after discount">+25% Lathe</span>' : "";
+      return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + spMark + latheMark + '</td>' +
         '<td>' + esc(fabricSummary(w) || "—") + ' <span class="pgtag">' + esc(p.group) + '</span></td>' +
         '<td class="mono">' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="mono ralign">' + money(p.base) + '</td>' +
@@ -1974,7 +1987,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var lineGst = p.blindNet * pr.gstRate;
       var springMark = p.spring ? ' \u2295' : "";
       var spMark = w.special ? ' [' + esc(specialLabel(w)) + ']' : "";
-      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + spMark + '</td>' +
+      var latheMark = p.lathe ? ' [+25% Lathe]' : "";
+      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "Window " + (i + 1)) + springMark + spMark + latheMark + '</td>' +
         '<td>' + esc(fabricSummary(w)) + ' (' + esc(p.group) + ')</td>' +
         '<td>' + esc(w.width || "") + ' × ' + esc(w.drop || "") + '</td>' +
         '<td class="ra">' + money(p.base) + '</td><td class="ra">' + (p.pct ? p.pct + "%" : "—") + '</td>' +
@@ -2691,7 +2705,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "A one-off fabric that isn't in the list", a: "Tick the \u201Cone-off\u201D box on that window and the fabric and colour boxes become free text, so you can type anything for a special order." },
         { q: "Overrolled or Underrolled", a: "Use the Roll drop-down to choose OR (overrolled) or UR (underrolled) for each blind." },
         { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these, and the cut list updates automatically. IMPORTANT: these options only set the cut size \u2014 the hardware itself must still be added in the Add-ons section below (a linking bracket for Linked, the motor for E6, both for Linked + E6). A reminder shows on the window, and the type is shown on the cut list and the pricing so it can be checked at invoicing. A special window is marked with a small purple \u201CS\u201D." },
-        { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
+        { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack." }, { q: "Lathe (No. 1 Pocket) baserail (price)", a: "As well as the extra drop, choosing the Lathe (No. 1 Pocket) baserail adds 25% to that blind\u2019s price. The 25% is worked out after the client\u2019s discount, and the line is tagged \u201C+25% Lathe\u201D on the pricing screen and printout." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
         { q: "Labels", a: "The Labels tab has two buttons. \u201CPrint blind labels\u201D makes one large sheet with the ORDER label first (bordered, with a large job name and address so blinds are easy to find on the shelf), then one label per blind. \u201CPrint tube labels\u201D makes one small label per blind with the tube length. Blind labels use Avery L7565 (8 per A4); tube labels use Avery L7651 (21 per A4). IMPORTANT: set the print scale to Actual size / 100% (not fit to page) so labels line up. The Hand (LH / RH) on the blind label comes from the Hand column on the Windows tab." }
       ]
