@@ -338,6 +338,12 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .chipbox{padding:9px 12px;font-size:13.5px;margin-right:4px}
 }
 .expcell{white-space:nowrap}
+.invtick{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;
+  background:#dcf3e4;color:#1d7a45;font-weight:800;font-size:15px;margin-right:6px;vertical-align:middle}
+.invbar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.invbar .invno{margin:0}
+.invbar .invno.off{opacity:.5}
+.invbar .invno input{width:120px}
 .expinput{font-family:var(--mono);font-size:13px;padding:6px 8px;border:1px solid var(--line);
   border-radius:7px;background:#fff;color:var(--text)}
 .expinput.manual{border-color:#d99a2b;background:#fff8e8;color:#8a5a05;font-weight:700}
@@ -1088,6 +1094,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       jobAddress: r.job_address || "", dateReceived: r.date_received || "",
       status: normStatus(r.status), notes: r.notes || "", clientNote: r.client_note || "", clientNoteAt: r.client_note_at || "",
       expectedOverride: r.expected_override || "",
+      invoiced: !!r.invoiced, invoiceNo: r.invoice_no || "",
       windows: Array.isArray(r.windows) ? r.windows : [],
       addons: Array.isArray(r.addons) ? r.addons : []
     };
@@ -1095,12 +1102,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   var FIELD_COL = {
     sanRef: "san_ref", clientRef: "client_ref", clientId: "client_id",
     jobName: "job_name", jobAddress: "job_address", dateReceived: "date_received",
-    status: "status", notes: "notes", clientNote: "client_note", expectedOverride: "expected_override"
+    status: "status", notes: "notes", clientNote: "client_note", expectedOverride: "expected_override",
+    invoiced: "invoiced", invoiceNo: "invoice_no"
   };
   function getJob(id) { return jobs.filter(function (j) { return j.id === id; })[0]; }
   function getClient(id) { return clients.filter(function (c) { return c.id === id; })[0]; }
   /* Expected completion: a manual date wins; otherwise count the
      client's lead time in working days, skipping holidays. */
+  function invoicedTick(j) {
+    if (!j.invoiced) return "";
+    var noTxt = j.invoiceNo ? (" \u00b7 Invoice " + j.invoiceNo) : "";
+    return '<span class="invtick" title="Invoiced' + esc(noTxt) + '">\u2713</span>';
+  }
   function noteBadge(j) {
     var note = (j.clientNote || "").trim();
     if (!note) {
@@ -1608,7 +1621,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           '<input type="date" class="expinput hidden" value="' + esc(exp.iso) + '" data-exp-job="' + j.id + '">' +
           (exp.manual ? '<button class="expreset" data-exp-clear="' + j.id + '" title="Back to the calculated date">↺</button>' : '') +
         '</td>' +
-        '<td class="rowact">' + noteBadge(j) +
+        '<td class="rowact">' + invoicedTick(j) + noteBadge(j) +
         '<button class="iconbtn del" data-del-job="' + j.id + '" title="Delete job" aria-label="Delete job">\u{1F5D1}</button></td></tr>';
     }).join("");
     var head = state.clientView
@@ -1764,6 +1777,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         ? 'This date was set by hand. <button class="link" data-exp-clear="' + job.id + '">Go back to the calculated date</button>'
         : 'Worked out from ' + clientLeadDays(job.clientId) + ' working days, skipping weekends and holidays.') +
       '</p>' +
+      '<div class="invbar">' +
+      '<label class="toggle"><input type="checkbox" data-job-field="invoiced" ' + (job.invoiced ? "checked" : "") + '><span>Invoiced</span></label>' +
+      '<label class="fld invno' + (job.invoiced ? "" : " off") + '"><span>Invoice number</span>' +
+      '<input value="' + esc(job.invoiceNo || "") + '" inputmode="numeric" maxlength="5" placeholder="5 digits" data-job-field="invoiceNo"' + (job.invoiced ? "" : " disabled") + '></label>' +
+      '</div>' +
       '<label class="fld wide"><span>Internal notes <span class="notetag staff">staff only</span></span>' +
       '<textarea rows="3" placeholder="Private — never shown to the client" data-job-field="notes">' + esc(job.notes || "") + '</textarea></label>' +
       '<label class="fld wide" style="margin-top:14px"><span>Client notes <span class="notetag client">visible to client</span></span>' +
@@ -2708,7 +2726,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Opening a job", a: "Press the \u201CEdit\u201D button on the left of any job row to open it. Inside a job you'll find tabs: Job info, Windows, Cloth cut list, Labels and Pricing." },
         { q: "What the columns mean", a: "SAN Ref is the job's reference number. Job is its name. Client and Address show who and where. Stage is how far along it is (tap the coloured box to change it). Expected is the completion date the program works out for you." },
         { q: "Changing a job's stage", a: "Tap the coloured stage box on the job's row and pick the new stage (for example, \u201CIn Production\u201D or \u201CItem on Order\u201D). The colour changes to match. This is how you track progress." },
-        { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
+        { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
         { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
         { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
         { q: "Deleting a job", a: "The trash-can icon on the right of a job row deletes it. Be careful \u2014 this can't be undone. Only delete a job if it was entered by mistake." }
@@ -3562,7 +3580,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
       "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday],[data-ao-del],[data-spectoggle]," +
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
-      "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear]," +
+      "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear],[data-exp-show]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
       "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client]," +
@@ -3781,6 +3799,19 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabcol")) { var fc = el.getAttribute("data-fabcol").split("_"); ensureFabricDraft().fabrics[+fc[0]].colours[+fc[1]] = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-basecol")) { var bc = el.getAttribute("data-basecol").split("_"); ensureFabricDraft().baserails[+bc[0]].colours[+bc[1]] = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute("data-job-field") && el.getAttribute("data-job-field") === "invoiced") {
+      job.invoiced = !!el.checked;
+      queueJobPatch(job.id, "invoiced", job.invoiced);
+      if (!job.invoiced) { job.invoiceNo = ""; queueJobPatch(job.id, "invoice_no", ""); }
+      render();   /* enable/disable the invoice-number box */
+      return;
+    }
+    if (el.hasAttribute("data-job-field") && el.getAttribute("data-job-field") === "invoiceNo") {
+      var digits = String(el.value).replace(/[^0-9]/g, "").slice(0, 5);   /* 5 digits max */
+      if (digits !== el.value) el.value = digits;
+      job.invoiceNo = digits; queueJobPatch(job.id, "invoice_no", digits);
+      return;
+    }
     if (el.hasAttribute("data-job-field")) {
       var f = el.getAttribute("data-job-field"); job[f] = el.value; if (FIELD_COL[f]) queueJobPatch(job.id, FIELD_COL[f], el.value);
     } else if (el.hasAttribute("data-win")) {
@@ -3791,6 +3822,16 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
   document.addEventListener("change", function (e) {
     var el = e.target;
+    if (el.hasAttribute && el.getAttribute && el.getAttribute("data-job-field") === "invoiced") {
+      var jb = getJob(state.jobId);
+      if (jb) {
+        jb.invoiced = !!el.checked;
+        queueJobPatch(jb.id, "invoiced", jb.invoiced);
+        if (!jb.invoiced) { jb.invoiceNo = ""; queueJobPatch(jb.id, "invoice_no", ""); }
+        render();
+      }
+      return;
+    }
     if (el.hasAttribute && el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
     if (el.hasAttribute && el.hasAttribute("data-fablf")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fablf")].lfSheer = !!el.checked; syncSavedTag(); return; }
     if (el.hasAttribute && el.hasAttribute("data-hwcat")) { ensureHardwareDraft().items[+el.getAttribute("data-hwcat")].cat = el.value; render(); return; }
