@@ -218,6 +218,12 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
 .grid tr.done .mono{color:#aab4bf}
 .grid tr.done .statussel{opacity:.7}
 .grid tr.done:hover td{background:#eef2f6}
+/* jobs due within 7 days — subtle warm highlight down the whole row */
+.grid tr.duesoon td{background:#fff7ec}
+.grid tr.duesoon:hover td{background:#fdf0dd}
+.grid tr.duesoon td:first-child{box-shadow:inset 3px 0 0 #e0a63a}
+.grid tr.duesoon.done td{background:#f7f9fb}
+.grid tr.duesoon.done td:first-child{box-shadow:none}
 .cfg{text-align:left;background:#f4f7fa;border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:#3c4a5a;overflow-x:auto;margin:14px 0 6px}
 .linkbox{width:100%;font-family:var(--mono);font-size:12px;padding:10px 12px;border:1px solid var(--line);
   border-radius:9px;background:#f7f9fb;color:#3c4a5a;margin:4px 0 12px}
@@ -338,8 +344,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .chipbox{padding:9px 12px;font-size:13.5px;margin-right:4px}
 }
 .expcell{white-space:nowrap}
-.invtick{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;
-  background:#dcf3e4;color:#1d7a45;font-weight:800;font-size:15px;margin-right:6px;vertical-align:middle}
+.invtick{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:30px;height:30px;box-sizing:border-box;
+  border-radius:8px;font-weight:800;font-size:15px;margin-right:6px;vertical-align:middle}
+.invtick.on{background:#dcf3e4;color:#1d7a45}
+.invtick.off{background:transparent;color:#c4ccd4}
+@media (max-width:1024px){.invtick{width:34px;height:34px}}
 .invbar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 .invbar .invno{margin:0}
 .invbar .invno.off{opacity:.5}
@@ -1110,9 +1119,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   /* Expected completion: a manual date wins; otherwise count the
      client's lead time in working days, skipping holidays. */
   function invoicedTick(j) {
-    if (!j.invoiced) return "";
-    var noTxt = j.invoiceNo ? (" \u00b7 Invoice " + j.invoiceNo) : "";
-    return '<span class="invtick" title="Invoiced' + esc(noTxt) + '">\u2713</span>';
+    if (j.invoiced) {
+      var noTxt = j.invoiceNo ? (" \u00b7 Invoice " + j.invoiceNo) : "";
+      return '<span class="invtick on" title="Invoiced' + esc(noTxt) + '">\u2713</span>';
+    }
+    return '<span class="invtick off" title="Not invoiced yet">\u2713</span>';
   }
   function noteBadge(j) {
     var note = (j.clientNote || "").trim();
@@ -1140,6 +1151,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (job.expectedOverride) return { iso: job.expectedOverride, manual: true };
     var d = addWorkingDays(job.dateReceived, clientLeadDays(job.clientId));
     return { iso: d ? localISO(d) : "", manual: false };
+  }
+  /* Is this job's expected completion within the next 7 days?
+     (Completed jobs are excluded — their date no longer matters.) */
+  function dueSoon(job, exp) {
+    if (job.status === "Job Complete" || job.status === "Cancelled") return false;
+    var iso = exp ? exp.iso : (expectedFor(job).iso);
+    if (!iso) return false;
+    var due = new Date(iso + "T00:00:00");
+    if (isNaN(due.getTime())) return false;
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var days = Math.round((due - today) / 86400000);
+    return days <= 7;   /* due within a week, including today and any overdue */
   }
   async function setExpectedOverride(jobId, iso) {
     var j = getJob(jobId); if (!j) return;
@@ -1602,11 +1625,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var c = getClient(j.clientId);
       var exp = expectedFor(j);
       if (state.clientView) {
-        return '<tr' + (j.status === "Job Complete" ? ' class="done"' : '') + '><td class="strong">' + esc(j.jobName || "—") + '</td><td>' + esc(c ? c.name : "—") +
+        var cvCls = (j.status === "Job Complete" ? "done " : "") + (dueSoon(j, exp) ? "duesoon" : "");
+        return '<tr' + (cvCls.trim() ? ' class="' + cvCls.trim() + '"' : '') + '><td class="strong">' + esc(j.jobName || "—") + '</td><td>' + esc(c ? c.name : "—") +
           '</td><td>' + badge(j.status) + '</td><td class="mono">' + esc(fmtDate(exp.iso)) + '</td></tr>';
       }
       var opts = STATUSES.map(function (s) { return '<option ' + (s === j.status ? "selected" : "") + '>' + esc(s) + '</option>'; }).join("");
-      return '<tr' + (j.status === "Job Complete" ? ' class="done"' : '') + '>' +
+      var rowCls = (j.status === "Job Complete" ? " done" : "") + (dueSoon(j, exp) ? " duesoon" : "");
+      return '<tr' + (rowCls ? ' class="' + rowCls.trim() + '"' : '') + '>' +
         '<td class="actcell">' +
         '<button class="btn small" data-edit="' + j.id + '">Edit</button></td>' +
         '<td class="mono">' + esc(j.sanRef || "") + '</td>' +
@@ -2726,7 +2751,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Opening a job", a: "Press the \u201CEdit\u201D button on the left of any job row to open it. Inside a job you'll find tabs: Job info, Windows, Cloth cut list, Labels and Pricing." },
         { q: "What the columns mean", a: "SAN Ref is the job's reference number. Job is its name. Client and Address show who and where. Stage is how far along it is (tap the coloured box to change it). Expected is the completion date the program works out for you." },
         { q: "Changing a job's stage", a: "Tap the coloured stage box on the job's row and pick the new stage (for example, \u201CIn Production\u201D or \u201CItem on Order\u201D). The colour changes to match. This is how you track progress." },
-        { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
+        { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
         { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
         { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
         { q: "Deleting a job", a: "The trash-can icon on the right of a job row deletes it. Be careful \u2014 this can't be undone. Only delete a job if it was entered by mistake." }
