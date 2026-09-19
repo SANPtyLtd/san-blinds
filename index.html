@@ -435,12 +435,24 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .ao-section:first-of-type{border-top:0}
 .ao-sechd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .ao-sechd span{font-weight:700;font-size:13.5px}
-.ao-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
-.ao-row .ao-name{font-weight:600;min-width:180px}
+.ao-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+.ao-row .ao-name{font-weight:600;min-width:180px;padding-top:8px}
 .ao-item{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px;min-width:220px}
-.ao-qty,.ao-target{font-size:13px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+.ao-qty{font-size:13px;color:var(--dim);display:inline-flex;align-items:center;gap:6px;padding-top:6px}
 .ao-qty input{width:64px;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit;font-size:14px;text-align:right}
-.ao-target select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px}
+.ao-target{display:inline-flex;flex-direction:column;align-items:flex-start;gap:6px;font-size:13px;position:relative}
+.ao-targbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13.5px;color:var(--text);cursor:pointer;white-space:nowrap}
+.ao-targbtn:hover{border-color:var(--teal)}
+.ao-targbtn.open{border-color:var(--teal);background:#f2fbf9}
+.ao-targbtn .caret{color:var(--dim);margin-left:3px}
+.ao-picklist{border:1px solid var(--line);border-radius:10px;padding:8px;background:#fbfdfe;max-height:260px;overflow-y:auto;min-width:220px;display:flex;flex-direction:column;gap:2px}
+.ao-pick{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;font-size:13.5px;color:var(--text)}
+.ao-pick:hover{background:#eef3f6}
+.ao-pick.on{background:#e7f4ee;font-weight:600}
+.ao-pick.whole{font-weight:700;border-bottom:1px solid var(--line);border-radius:7px 7px 0 0;margin-bottom:2px}
+.ao-pick input{margin:0}
+.ao-pagedivider{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:700;padding:8px 8px 3px;border-top:1px solid var(--line);margin-top:3px}
+.ao-pagedivider:first-of-type{border-top:0;margin-top:0}
 .discrow.special.on{background:#f6f2fe;border-radius:8px}
 .specinput{display:inline-flex;align-items:center;gap:0}
 .spectoggle{width:30px;height:34px;border:1px solid var(--line);border-right:0;border-radius:8px 0 0 8px;background:#f3f5f7;cursor:pointer;font-weight:700;font-size:14px;color:#516072}
@@ -962,14 +974,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     /* attach the "applies to" label to each add-on line */
     var rawAddons = jobAddons(job);
     addonLines.forEach(function (a, i) {
-      var tgt = rawAddons[i] ? rawAddons[i].target : "job";
-      if (!tgt || tgt === "job") { a.appliesTo = "Whole job"; }
-      else {
-        var wi = -1;
-        (job.windows || []).forEach(function (w, k) { if (w.id === tgt) wi = k; });
-        var wobj = (job.windows || []).filter(function (w) { return w.id === tgt; })[0];
-        a.appliesTo = wobj ? ((wobj.name || "").trim() || ("Window " + (wi + 1))) : "Whole job";
-      }
+      a.appliesTo = rawAddons[i] ? addonAppliesLabel(job, rawAddons[i]) : "Whole job";
     });
     netTotal += addonTotal;
     var gst = netTotal * gstRate;
@@ -1946,20 +1951,37 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<p class="hint">Pages group blinds for the assembly line (e.g. blockout on one page, sunscreen on the next). Cut lists and labels print each page separately; pricing totals everything together.</p>';
   }
   function jobAddons(job) { return Array.isArray(job.addons) ? job.addons : []; }
+  /* An add-on's targets: an array of window IDs, or ["job"] for the whole job.
+     Migrates the old single `target` string to the new `targets` array. */
+  function addonTargets(a) {
+    if (Array.isArray(a.targets)) return a.targets;
+    if (a.target === "job" || !a.target) return ["job"];
+    return [a.target];
+  }
+  function isWholeJobAddon(a) {
+    var t = addonTargets(a);
+    return t.indexOf("job") !== -1 || t.length === 0;
+  }
+  /* Human summary of what an add-on applies to (for the pricing screen + collapsed button). */
+  function addonAppliesLabel(job, a) {
+    if (isWholeJobAddon(a)) return "Whole job";
+    var t = addonTargets(a);
+    var names = t.map(function (wid) {
+      var wi = -1;
+      (job.windows || []).forEach(function (w, k) { if (w.id === wid) wi = k; });
+      var wobj = (job.windows || []).filter(function (w) { return w.id === wid; })[0];
+      return wobj ? ((wi + 1) + ". " + ((wobj.name || "").trim() || ("Window " + (wi + 1)))) : null;
+    }).filter(Boolean);
+    if (!names.length) return "Whole job";
+    if (names.length <= 2) return names.join(", ");
+    return names.length + " blinds";
+  }
   function addonsPanel(job) {
     var items = hardwareSettings.items;
     var list = jobAddons(job);
     if (!items.length) {
       return '<div class="card pad addonspanel"><div class="cardbar"><div><b>Add-ons</b></div></div>' +
         '<p class="dim">No hardware items yet. Add them on the <b>Hardware</b> tab first.</p></div>';
-    }
-    function targetOpts(sel) {
-      var o = '<option value="job"' + (sel === "job" ? " selected" : "") + '>Whole job</option>';
-      o += job.windows.map(function (w, i) {
-        var lbl = (w.name || "").trim() || ("Window " + (i + 1));
-        return '<option value="' + esc(w.id) + '"' + (sel === w.id ? " selected" : "") + '>' + esc(lbl) + '</option>';
-      }).join("");
-      return o;
     }
     /* which category does a given add-on row belong to?
        - if it has a chosen item, use that item's category
@@ -1973,6 +1995,34 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         .slice().sort(function (a, b) { return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase()); })
         .map(function (h) { return '<option value="' + esc(h.id) + '"' + (h.id === selId ? " selected" : "") + '>' + esc(h.name) + '</option>'; }).join("");
     }
+    function targetPicker(a, i) {
+      var summary = addonAppliesLabel(job, a);
+      var open = aoOpen[i] === true;
+      var targets = addonTargets(a);
+      var wholeOn = isWholeJobAddon(a);
+      var body = "";
+      if (open) {
+        body += '<div class="ao-picklist">';
+        /* Whole job tick at the top */
+        body += '<label class="ao-pick whole' + (wholeOn ? " on" : "") + '"><input type="checkbox" data-ao-whole="' + i + '"' + (wholeOn ? " checked" : "") + '><span>Whole job</span></label>';
+        /* blinds grouped by page, with a divider between pages */
+        var total = pageCount(job);
+        for (var pnum = 1; pnum <= total; pnum++) {
+          var pageWins = windowsOnPage(job, pnum);
+          if (!pageWins.length) continue;
+          if (total > 1) body += '<div class="ao-pagedivider">' + esc(pageLabel(pnum, total)) + '</div>';
+          body += pageWins.map(function (w) {
+            var globalIdx = job.windows.indexOf(w);
+            var lbl = (globalIdx + 1) + ". " + ((w.name || "").trim() || ("Window " + (globalIdx + 1)));
+            var on = !wholeOn && targets.indexOf(w.id) !== -1;
+            return '<label class="ao-pick' + (on ? " on" : "") + '"><input type="checkbox" data-ao-blind="' + i + '" data-wid="' + esc(w.id) + '"' + (on ? " checked" : "") + (wholeOn ? " disabled" : "") + '><span>' + esc(lbl) + '</span></label>';
+          }).join("");
+        }
+        body += '</div>';
+      }
+      return '<span class="ao-target"><button type="button" class="ao-targbtn' + (open ? " open" : "") + '" data-ao-toggletarget="' + i + '">' +
+        'Applies to: <b>' + esc(summary) + '</b> <span class="caret">' + (open ? "\u25be" : "\u25b8") + '</span></button>' + body + '</span>';
+    }
     function sectionRows(cat) {
       /* keep each row's real index in the job's addons array for editing */
       var idxs = list.map(function (a, i) { return i; }).filter(function (i) { return rowCat(list[i]) === cat; });
@@ -1984,7 +2034,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           : '<select class="ao-item" data-ao-item="' + i + '">' + itemOptsFor(cat, a.id) + '</select>';
         return '<div class="ao-row">' + nameCell +
           '<span class="ao-qty">Qty <input type="number" inputmode="numeric" min="1" value="' + esc(a.qty || 1) + '" data-ao-qty="' + i + '"></span>' +
-          '<span class="ao-target">Applies to <select data-ao-target="' + i + '">' + targetOpts(a.target || "job") + '</select></span>' +
+          targetPicker(a, i) +
           '<button class="iconbtn del" data-ao-del="' + i + '" title="Remove add-on" aria-label="Remove add-on">\u{1F5D1}</button>' +
           '</div>';
       }).join("");
@@ -2778,6 +2828,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   /* ---------- Fabrics management tab ---------- */
   var fabricDraft = null;   /* working copy while editing */
   var fabricOpen = {};      /* which fabric colour lists are expanded */
+  var aoOpen = {};          /* which add-on "applies to" pickers are expanded */
   var baserailOpen = {};    /* which baserail colour lists are expanded */
   function fabricDirty() { return fabricDraft && JSON.stringify(fabricDraft) !== JSON.stringify(fabricSettings); }
   function ensureFabricDraft() { if (!fabricDraft) fabricDraft = JSON.parse(JSON.stringify(fabricSettings)); return fabricDraft; }
@@ -2891,7 +2942,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     {
       id: "addons", icon: "\u{1F527}", title: "Add-ons (motorisation & hardware)",
       items: [
-        { q: "Adding hardware to a job", a: "Open the job, go to the Windows tab, and scroll to the Add-ons panel below the windows. It's split into Motorisation and Blind hardware. Press \u201C+ Add\u201D under the right heading, choose the item, set the quantity, and choose whether it applies to the whole job or one particular window." },
+        { q: "Adding hardware to a job", a: "Open the job, go to the Windows tab, and scroll to the Add-ons panel below the windows. It's split into Motorisation and Blind hardware. Press \u201C+ Add\u201D under the right heading, choose the item, set the quantity, and choose which blinds it applies to \u2014 tap \u201CApplies to\u201D to open a tick-list (grouped by page) and tick the whole job or any blinds it belongs to." },
         { q: "Where the item list comes from", a: "The items you can choose come from the Hardware tab. If something you need isn't there, add it on the Hardware tab first (see the Hardware section below)." },
         { q: "Spring Assist", a: "This is added automatically \u2014 any blind whose ordered width \u00D7 drop is over 4.5 square metres gets a Spring Assist ($36.50 + GST). You'll see it flagged on the cut list and priced on the Pricing tab. You don't need to add it yourself." }
       ]
@@ -3733,7 +3784,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   /* ---------- events ---------- */
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-go],[data-action],[data-edit],[data-del-job],[data-tab]," +
-      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday],[data-ao-del],[data-spectoggle]," +
+      "[data-edit-client],[data-del-client],[data-del-win],[data-del-holiday],[data-ao-del],[data-ao-toggletarget],[data-spectoggle]," +
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear],[data-exp-show]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
@@ -3827,6 +3878,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       state.winPage = newPage;
       saveWindows(jp); render();
     }
+    else if (t.hasAttribute("data-ao-toggletarget")) { var aok = +t.getAttribute("data-ao-toggletarget"); aoOpen[aok] = !aoOpen[aok]; render(); }
     else if (t.hasAttribute("data-ao-del")) {
       var jobD = getJob(state.jobId);
       jobD.addons = jobAddons(jobD).filter(function (a, i) { return i !== +t.getAttribute("data-ao-del"); });
@@ -4015,7 +4067,28 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.hasAttribute && el.hasAttribute("data-fablf")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fablf")].lfSheer = !!el.checked; syncSavedTag(); return; }
     if (el.hasAttribute && el.hasAttribute("data-hwcat")) { ensureHardwareDraft().items[+el.getAttribute("data-hwcat")].cat = el.value; render(); return; }
     if (el.hasAttribute && el.hasAttribute("data-ao-item")) { var ji = getJob(state.jobId); var ai = jobAddons(ji)[+el.getAttribute("data-ao-item")]; if (ai) { ai.id = el.value; saveAddons(ji); render(); } return; }
-    if (el.hasAttribute && el.hasAttribute("data-ao-target")) { var jt = getJob(state.jobId); var at = jobAddons(jt)[+el.getAttribute("data-ao-target")]; if (at) { at.target = el.value; saveAddons(jt); } return; }
+    if (el.hasAttribute && el.hasAttribute("data-ao-whole")) {
+      var jw = getJob(state.jobId); var aw = jobAddons(jw)[+el.getAttribute("data-ao-whole")];
+      if (aw) {
+        if (el.checked) { aw.targets = ["job"]; delete aw.target; }
+        else { aw.targets = []; delete aw.target; }  /* unticking whole job -> pick blinds */
+        saveAddons(jw); render();
+      }
+      return;
+    }
+    if (el.hasAttribute && el.hasAttribute("data-ao-blind")) {
+      var jbl = getJob(state.jobId); var ab = jobAddons(jbl)[+el.getAttribute("data-ao-blind")];
+      if (ab) {
+        var wid = el.getAttribute("data-wid");
+        var cur = addonTargets(ab).filter(function (x) { return x !== "job"; });   /* drop whole-job */
+        var pos = cur.indexOf(wid);
+        if (el.checked) { if (pos === -1) cur.push(wid); }
+        else { if (pos !== -1) cur.splice(pos, 1); }
+        ab.targets = cur; delete ab.target;
+        saveAddons(jbl); render();
+      }
+      return;
+    }
     if (el.hasAttribute("data-exp-job")) { setExpectedOverride(el.getAttribute("data-exp-job"), el.value); return; }
     if (el.hasAttribute("data-exp-show")) { return; }
     if (el.hasAttribute("data-status-job")) {
