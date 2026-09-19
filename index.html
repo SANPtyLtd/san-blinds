@@ -207,6 +207,10 @@ select.statussel.s-purple{background:#ece3f7;color:#6b3fa0}
   .p-grid{width:100%;border-collapse:collapse;font-size:13px}
   .p-grid th,.p-grid td{border:1px solid #333;padding:7px 9px;text-align:left}
   .p-grid th{background:#eee}
+  .p-grid.pcut{font-size:11px}
+  .p-grid.pcut th,.p-grid.pcut td{padding:5px 5px}
+  .p-grid.pcut .p-num4{width:11mm;text-align:right;white-space:nowrap}
+  .p-grid.pcut .p-osz{width:16mm}
   .p-labels{display:grid;grid-template-columns:1fr 1fr;gap:8mm}
   .p-labels .label{border:1.5px solid #000;page-break-inside:avoid}
 }
@@ -448,6 +452,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .pricegrid tr.springline td{background:#fffaf0;border-top:1px solid var(--line)}
 .springyes{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#fff2d6;color:#8a5a05}
 .cut th.shade,.cut td.shade{background:#eef3f6}
+.cut th.num4,.cut td.num4{width:56px;min-width:56px;text-align:right;white-space:nowrap}
+.cut th.osz,.cut td.osz{width:88px;min-width:88px}
 .cut tr:hover td.shade{background:#e6edf1}
 @media print{ .p-spring{color:#000;font-weight:700} .p-quote tr.pt-spring td{border-top:1px solid #bbb} .p-grid th.pshade,.p-grid td.pshade{background:#e9eef2 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact} }
 .pricegrid tr.unpriced td{background:#fff8e8;color:#8a5a05}
@@ -2145,16 +2151,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var spring = needsSpringAssist(w) ? '<span class="springyes">Spring Assist</span>' : '<span class="dim">—</span>';
       var sp = w.special ? '<span class="spcell">' + esc(specialLabel(w)) + '</span>' : '<span class="dim">—</span>';
       return '<tr' + (w.special ? ' class="specialrow"' : '') + '><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") +
+        '</td><td class="mono num4">' + esc(w.width || "") +
+        '</td><td class="mono num4">' + esc(w.drop || "") +
         '</td><td>' + sp +
-        '</td><td class="mono shade">' + mm(windowTubeLength(w)) +
+        '</td><td class="mono shade num4">' + mm(windowTubeLength(w)) +
         '</td><td>' + esc(fabricSummary(w) || "—") +
-        '</td><td class="mono shade strong">' + mm(cw) +
-        '</td><td class="mono shade">' + mm(windowClothDrop(w)) +
+        '</td><td class="mono shade strong num4">' + mm(cw) +
+        '</td><td class="mono shade num4">' + mm(windowClothDrop(w)) +
         '</td><td>' + esc(baserailSummary(w) || "—") +
-        '</td><td class="mono shade">' + mm(windowBaserail(w)) +
-        '</td><td>' + spring + '</td></tr>';
+        '</td><td class="mono shade num4">' + mm(windowBaserail(w)) +
+        '</td><td class="osz">' + spring + '</td></tr>';
     }).join("");
-    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th>Special</th><th class="shade">Tube length</th><th>Fabric / colour</th><th class="shade">Cloth width</th><th class="shade">Cloth drop</th><th>Baserail type / colour</th><th class="shade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th class="num4">Width</th><th class="num4">Drop</th><th>Special</th><th class="shade num4">Tube</th><th>Fabric / colour</th><th class="shade num4">Cloth W</th><th class="shade num4">Cloth D</th><th>Baserail</th><th class="shade num4">B/rail mm</th><th class="osz">Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
@@ -2263,9 +2271,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var total = pageCount(job);
     var allWs = activeWindows(job);
     var sheetsHTML = "";
-    /* order label first, on its own leading sheet */
-    sheetsHTML += paginateLabels([orderLabelHTML(job, cn, allWs.length)], 8);
-    /* then each window page's blind labels, each page starting on a fresh sheet */
+    /* each window page starts on a fresh sheet; the order label leads page 1's sheet */
     for (var pg = 1; pg <= total; pg++) {
       var ws = activeWindowsOnPage(job, pg);
       if (!ws.length) continue;
@@ -2274,6 +2280,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var cells = ws.map(function (w, i) {
         return blindLabelHTML(job, w, i, cn, allWs.length, { page: thisPage, index: i, pageCount: pageBlindCount });
       });
+      /* order (summary) label becomes the very first label on the first page's sheet */
+      if (pg === 1) cells.unshift(orderLabelHTML(job, cn, allWs.length));
       sheetsHTML += paginateLabels(cells, 8);
     }
     doPrint(sheetsHTML, LARGE_PAGE_CSS);   /* 8 large labels per A4 (L7565) */
@@ -3338,17 +3346,19 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       return ws.map(function (w, i) {
         var spring = needsSpringAssist(w) ? "Spring Assist" : "";
         return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") +
+          '</td><td class="p-num4">' + esc(w.width || "") +
+          '</td><td class="p-num4">' + esc(w.drop || "") +
           '</td><td>' + esc(specialLabel(w)) +
-          '</td><td class="pshade">' + mm(windowTubeLength(w)) +
+          '</td><td class="pshade p-num4">' + mm(windowTubeLength(w)) +
           '</td><td>' + esc(fabricSummary(w) || "") +
-          '</td><td class="pshade">' + mm(windowClothWidth(w)) +
-          '</td><td class="pshade">' + mm(windowClothDrop(w)) +
+          '</td><td class="pshade p-num4">' + mm(windowClothWidth(w)) +
+          '</td><td class="pshade p-num4">' + mm(windowClothDrop(w)) +
           '</td><td>' + esc(baserailSummary(w) || "") +
-          '</td><td class="pshade">' + mm(windowBaserail(w)) +
-          '</td><td class="p-spring">' + spring + '</td></tr>';
+          '</td><td class="pshade p-num4">' + mm(windowBaserail(w)) +
+          '</td><td class="p-spring p-osz">' + spring + '</td></tr>';
       }).join("");
     }
-    var head = '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Special</th><th class="pshade">Tube length</th><th>Fabric / colour</th><th class="pshade">Cloth width</th><th class="pshade">Cloth drop</th><th>Baserail type / colour</th><th class="pshade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>';
+    var head = '<table class="p-grid pcut"><thead><tr><th>#</th><th>Window</th><th class="p-num4">Width</th><th class="p-num4">Drop</th><th>Special</th><th class="pshade p-num4">Tube</th><th>Fabric / colour</th><th class="pshade p-num4">Cloth W</th><th class="pshade p-num4">Cloth D</th><th>Baserail</th><th class="pshade p-num4">B/rail mm</th><th class="p-osz">Oversize</th></tr></thead><tbody>';
     var sheets = [];
     for (var pg = 1; pg <= total; pg++) {
       var ws = activeWindowsOnPage(job, pg);
