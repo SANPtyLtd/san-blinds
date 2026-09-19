@@ -469,8 +469,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .dualyes{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#e0edfa;color:#215fa6}
 .cut th.shade,.cut td.shade{background:#eef3f6}
 .cut th.num4,.cut td.num4{width:56px;min-width:56px;text-align:right;white-space:nowrap}
-.cut th.osz,.cut td.osz{width:96px;min-width:96px}
+.cut th.osz,.cut td.osz{width:82px;min-width:82px}
+.noterow{display:flex;gap:5px;align-items:center;flex-wrap:nowrap;white-space:nowrap}
 .notestack{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.notechip{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 6px;border-radius:6px;font-size:11.5px;font-weight:800;cursor:default}
+.notechip.dualyes,.notechip.springyes{padding:0 6px;border-radius:6px;font-size:11.5px}
 .notescell{vertical-align:middle}
 .cut tr:hover td.shade{background:#e6edf1}
 @media print{ .p-spring{color:#000;font-weight:700} .p-quote tr.pt-spring td{border-top:1px solid #bbb} .p-grid th.pshade,.p-grid td.pshade{background:#e9eef2 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact} }
@@ -2222,11 +2225,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var ws = activeWindows(job);
     var rows = ws.map(function (w, i) {
       var cw = windowClothWidth(w);
-      /* Notes column: stack Dual and Spring Assist flags (whichever apply) */
+      /* Notes column (screen): compact side-by-side chips with hover tooltips */
       var notes = [];
-      if (w.dual) notes.push('<span class="dualyes">Dual</span>');
-      if (needsSpringAssist(w)) notes.push('<span class="springyes">Spring Assist</span>');
-      var notesCell = notes.length ? '<div class="notestack">' + notes.join("") + '</div>' : '<span class="dim">—</span>';
+      if (w.dual) notes.push('<span class="notechip dualyes" title="Dual brackets">D</span>');
+      if (needsSpringAssist(w)) notes.push('<span class="notechip springyes" title="Spring Assist (oversize)">SA</span>');
+      var notesCell = notes.length ? '<div class="noterow">' + notes.join("") + '</div>' : '<span class="dim">—</span>';
       var sp = w.special ? '<span class="spcell">' + esc(specialLabel(w)) + '</span>' : '<span class="dim">—</span>';
       return '<tr' + (w.special ? ' class="specialrow"' : '') + '><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") +
         '</td><td class="mono num4">' + esc(w.width || "") +
