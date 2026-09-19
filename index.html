@@ -105,6 +105,7 @@ td.idx,.idx{color:var(--dim);width:34px;text-align:center;font-family:var(--mono
 .s-amber{background:#fbefd6;color:#996515} .s-orange{background:#fce3d4;color:#b1521f}
 .s-slate{background:#e7e9f4;color:#4b4f86} .s-red{background:#fbe0e0;color:#b12a2a}
 .s-green{background:#dcf3e4;color:#1d7a45}
+.s-teal{background:#d5f0ee;color:#0f6e66} .s-purple{background:#ece3f7;color:#6b3fa0}
 select.statussel{border:0;font-weight:700;font-size:12.5px;padding:5px 8px;border-radius:999px;cursor:pointer;appearance:none;-webkit-appearance:none}
 select.statussel.s-grey{background:#eef1f4;color:#516072}
 select.statussel.s-blue{background:#e4eefb;color:#215fa6}
@@ -113,6 +114,8 @@ select.statussel.s-orange{background:#fce3d4;color:#b1521f}
 select.statussel.s-slate{background:#e7e9f4;color:#4b4f86}
 select.statussel.s-red{background:#fbe0e0;color:#b12a2a}
 select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
+select.statussel.s-teal{background:#d5f0ee;color:#0f6e66}
+select.statussel.s-purple{background:#ece3f7;color:#6b3fa0}
 
 /* controls */
 .search{padding:9px 13px;border:1px solid var(--line);border-radius:9px;font-size:14px;width:230px;font-family:inherit}
@@ -143,6 +146,13 @@ select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
 .entry input:focus,.entry select:focus{outline:2px solid var(--teal);border-color:var(--teal)}
 .entry input.num{font-family:var(--mono);text-align:right}
 .entryfoot{display:flex;align-items:center;justify-content:space-between;padding:14px 18px}
+.pagetabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pagetab{border:1px solid var(--line);background:#fff;border-radius:9px 9px 0 0;padding:9px 16px;font-family:inherit;
+  font-size:13.5px;font-weight:600;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent}
+.pagetab:hover{background:#f5f8fa;color:var(--text)}
+.pagetab.on{color:var(--teal);border-bottom-color:var(--teal);background:#f2fbf9}
+.pagetab.addpage{color:var(--teal);border-style:dashed}
+.pagetab.addpage:hover{background:#f2fbf9}
 .addbtns{display:flex;gap:10px;flex-wrap:wrap}
 .count{color:var(--dim);font-size:13px;font-family:var(--mono)}
 .hint{color:var(--dim);font-size:13.5px;margin:14px 2px 0}
@@ -970,15 +980,18 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function companyLine() { return COMPANY.name + " · " + COMPANY.address + " · Ph " + COMPANY.phone + " · " + COMPANY.email; }
 
   var STATUSES = ["Not Started", "In Production", "Item on Order",
-    "Delayed", "On Hold", "Cancelled", "Job Complete"];
+    "Delayed", "On Hold", "Blinds Ready", "Invoiced", "Finalised", "Cancelled"];
   var STATUS_CLASS = {
     "Not Started": "s-grey", "In Production": "s-blue",
     "Item on Order": "s-amber", "Delayed": "s-orange",
-    "On Hold": "s-slate", "Cancelled": "s-red", "Job Complete": "s-green"
+    "On Hold": "s-slate", "Blinds Ready": "s-teal", "Invoiced": "s-purple",
+    "Finalised": "s-green", "Cancelled": "s-red"
   };
+  /* The "done" state (hidden under Show completed, greyed row, no due-soon highlight). */
+  var DONE_STATUS = "Finalised";
   /* Older jobs may have the previous label saved in the database.
      Map any retired names to their current one so nothing shows blank. */
-  var STATUS_ALIASES = { "Fabric / Product on Order": "Item on Order" };
+  var STATUS_ALIASES = { "Fabric / Product on Order": "Item on Order", "Job Complete": "Finalised" };
   function normStatus(s) { return (s && STATUS_ALIASES[s]) ? STATUS_ALIASES[s] : (s || "Not Started"); }
   var FACE_REC = ["Face / Make", "Rec / Tight"];
   var MAX_WINDOWS = 30;
@@ -1033,7 +1046,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     return clothWidth(w.faceRec, w.width);
   }
   function windowTubeLength(w) { return windowClothWidth(w); }
-  function windowBaserail(w) { var cw = windowClothWidth(w); return cw === null ? null : cw + 2; }
+  /* Baserails whose finished cut length differs from the standard cloth width + 2.
+     Lathe (No. 1 Pocket): cloth width − 5. */
+  var BASERAIL_CUT_OFFSET = { "Lathe (No. 1 Pocket)": -5 };
+  function windowBaserail(w) {
+    var cw = windowClothWidth(w);
+    if (cw === null) return null;
+    var off = (w && w.baserail && (w.baserail in BASERAIL_CUT_OFFSET)) ? BASERAIL_CUT_OFFSET[w.baserail] : 2;
+    return cw + off;
+  }
   /* Human label for a special window's type, for the cut list. */
   function specialLabel(w) {
     if (!w || !w.special) return "";
@@ -1155,7 +1176,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   /* Is this job's expected completion within the next 7 days?
      (Completed jobs are excluded — their date no longer matters.) */
   function dueSoon(job, exp) {
-    if (job.status === "Job Complete" || job.status === "Cancelled") return false;
+    if (job.status === DONE_STATUS || job.status === "Cancelled") return false;
     var iso = exp ? exp.iso : (expectedFor(job).iso);
     if (!iso) return false;
     var due = new Date(iso + "T00:00:00");
@@ -1177,6 +1198,24 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function activeWindows(job) {
     return job.windows.filter(function (w) { return (w.name || "").trim() || num(w.width) || num(w.drop); });
   }
+  /* ---- window pages ----
+     Windows carry a "page" number (1, 2, 3...). Existing windows with no page
+     default to page 1. Pages group blinds for the assembly line, cut lists and
+     labels; pricing ignores pages and totals everything. Max 20 blinds per page. */
+  var WINDOWS_PER_PAGE = 20;
+  function winPage(w) { var p = parseInt(w.page, 10); return (p && p > 0) ? p : 1; }
+  function pageCount(job) {
+    var max = 1;
+    (job.windows || []).forEach(function (w) { var p = winPage(w); if (p > max) max = p; });
+    return max;
+  }
+  function windowsOnPage(job, page) {
+    return (job.windows || []).filter(function (w) { return winPage(w) === page; });
+  }
+  function activeWindowsOnPage(job, page) {
+    return windowsOnPage(job, page).filter(function (w) { return (w.name || "").trim() || num(w.width) || num(w.drop); });
+  }
+  function pageLabel(page, total) { return "Page " + page + " of " + total; }
 
   /* ---------- blind fabrics + baserails ---------- */
   var BUILTIN_FABRICS = { fabrics: [{"name": "Vibe", "colours": ["Tundra", "Nimbus", "Alloy", "Surf", "Mist", "Terrace", "Limestone", "Pure", "Lace", "Cloud", "Birch", "Loft", "Porcelain", "Linen", "Moon", "Spirit", "Dune", "Dbistro", "Chateau", "Stone", "Clay", "Umber", "Odessey", "Orient", "Coal", "Lava Metallic", "Mercury Metallic", "Brulee Metallic", "Storm", "Whisper", "Ice"]}, {"name": "Aventus 5%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 3%", "colours": ["White", "White Stone", "White Grey", "Charcoal Grey", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 10%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Linesque Blockout", "colours": ["Almond", "Aspen", "Blanco", "Breeze", "Denim", "Dove", "Fig", "Fleece", "Fossil", "Raffia", "Soba", "Vine"]}, {"name": "Linesque Light Filtering", "colours": ["Lily", "Oatcake", "Wicker", "Hazel", "Trellis", "Chestnut", "Owl", "Winter", "Delta", "Granite", "Stonewash", "Levi"]}, {"name": "Endota", "colours": ["Optic", "Natural White", "Almond", "Cashmere", "Pastel", "Soft Sable", "Eucalypt", "Smokey", "Flagstone", "Gentle Grey", "Cool Black"]}, {"name": "Le Reve Blockout", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Le Reve Light Filtering", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Mantra Blockout", "colours": ["Cotton", "Opal", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Spice", "Flint", "Pebble", "Shale"]}, {"name": "Mantra Light Filtering", "colours": ["Cotton", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Pebble", "Shale"]}, {"name": "Skye Blockout", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Skye Light Filtering", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Palm Beach Blockout", "colours": ["Quill", "Lyric", "Merino", "Jasmine", "Gull", "Porpoise", "Urben", "Thunder", "Summer Storm", "Iron", "Dusk", "Quartz"]}, {"name": "Palm Beach Light Filtering", "colours": ["Melody", "Horizon", "Angora", "Pearl", "Monsoon", "Steel", "Ink"]}, {"name": "Duo Block 3.0", "colours": ["Aztec", "Basalt", "Calm", "Carbon", "Cumulus", "Dove", "Muse", "Nova", "Stella", "Salt"]}, {"name": "Duo Light", "colours": ["Bright White", "Warm White", "Mid Grey"]}, {"name": "Duo Screen", "colours": ["White", "White Stone", "White Linen", "Dune Grey", "White Grey", "Blue Grey", "Charcoal Grey", "Charcoal Slate", "Charcoal"]}, {"name": "Edge", "colours": ["Alabaster", "Ammonite", "Bright", "Calico", "Charcoal", "Ironstone", "Pumice", "Soft Grey"]}, {"name": "Bond", "colours": ["Ice", "Chalk", "Linen", "Taupe", "Cloud", "Concrete", "Granite", "Charcoal"]}, {"name": "Resene Origin", "colours": ["All Black", "Baltic Sea", "Double Stack", "Surrender", "Concrete", "Alabaster", "Black White", "Rice Cake", "Quarter Tea", "Truffle", "Masala", "Bokara Grey"]}, {"name": "St Lucia", "colours": ["Arctic", "Ice", "White", "Stone", "Silver", "Charcoal"]}, {"name": "SB Opulence", "colours": ["White", "Taupe Grey", "Alabaster", "Silver", "Ivory", "Haze", "Champagne", "Shadow", "Merino", "Black"]}, {"name": "Tasman", "colours": ["Ice", "Ivory", "Beech", "Platinium", "Domino", "Storm", "Graphite", "Skyline", "Shadow"]}, {"name": "Woolamai", "colours": ["Cloud", "Silver", "Sand", "Storm", "Driftwood", "Basalt", "Stone", "Onyx"]}, {"name": "Dawn", "colours": ["White", "Linen", "Oyster", "Warm White", "Custom Cream", "Natural", "Angora", "Gosling", "Ecru", "Pannacotta", "Birch", "Thunder", "Soft Grey", "Daybreak", "Cotton", "Ash Blue", "Grey", "Mid Grey", "Crane", "Dark Grey", "Black", "Arum", "Mariah", "Putty", "Misty", "Alabaster", "Ivory", "Sesame", "Dune", "Earthen", "Pewter", "Light Bison", "Slate"]}], baserails: [{"type": "Oval", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "D30 Silent", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone", "Matt Black", "Matt White"]}, {"type": "Minimal", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "Lathe", "colours": ["Timber"]}] };
@@ -1370,7 +1409,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       SUPABASE_URL.indexOf("PASTE_") === -1 && SUPABASE_KEY.indexOf("PASTE_") === -1;
   }
 
-  var state = { view: "dashboard", jobId: null, quoteId: null, tab: "info", clientView: false, showCompleted: false, search: "", quoteSearch: "" };
+  var state = { view: "dashboard", jobId: null, quoteId: null, tab: "info", winPage: 1, clientView: false, showCompleted: false, search: "", quoteSearch: "" };
 
   /* ---------- quoting ---------- */
   var MAX_QUOTE_WINDOWS = 30;
@@ -1613,9 +1652,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function renderDashboard() {
     var q = state.search.toLowerCase();
-    var completedCount = jobs.filter(function (j) { return j.status === "Job Complete"; }).length;
+    var completedCount = jobs.filter(function (j) { return j.status === DONE_STATUS; }).length;
     var list = jobs.filter(function (j) {
-      if (!state.showCompleted && j.status === "Job Complete") return false;
+      if (!state.showCompleted && j.status === DONE_STATUS) return false;
       if (!q) return true;
       var c = getClient(j.clientId);
       return [j.sanRef, j.clientRef, j.jobName, j.jobAddress, j.status, c ? c.name : ""]
@@ -1625,12 +1664,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var c = getClient(j.clientId);
       var exp = expectedFor(j);
       if (state.clientView) {
-        var cvCls = (j.status === "Job Complete" ? "done " : "") + (dueSoon(j, exp) ? "duesoon" : "");
+        var cvCls = (j.status === DONE_STATUS ? "done " : "") + (dueSoon(j, exp) ? "duesoon" : "");
         return '<tr' + (cvCls.trim() ? ' class="' + cvCls.trim() + '"' : '') + '><td class="strong">' + esc(j.jobName || "—") + '</td><td>' + esc(c ? c.name : "—") +
           '</td><td>' + badge(j.status) + '</td><td class="mono">' + esc(fmtDate(exp.iso)) + '</td></tr>';
       }
       var opts = STATUSES.map(function (s) { return '<option ' + (s === j.status ? "selected" : "") + '>' + esc(s) + '</option>'; }).join("");
-      var rowCls = (j.status === "Job Complete" ? " done" : "") + (dueSoon(j, exp) ? " duesoon" : "");
+      var rowCls = (j.status === DONE_STATUS ? " done" : "") + (dueSoon(j, exp) ? " duesoon" : "");
       return '<tr' + (rowCls ? ' class="' + rowCls.trim() + '"' : '') + '>' +
         '<td class="actcell">' +
         '<button class="btn small" data-edit="' + j.id + '">Edit</button></td>' +
@@ -1817,10 +1856,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function windowsTab(job) {
     function opt(v, sel) { return '<option ' + (v === sel ? "selected" : "") + '>' + esc(v) + '</option>'; }
-    var rows = job.windows.map(function (w, i) {
+    var total = pageCount(job);
+    var cur = state.winPage || 1;
+    if (cur > total) cur = total;
+    var pageWins = windowsOnPage(job, cur);
+    var rows = pageWins.map(function (w) {
+      var i = job.windows.indexOf(w);   /* global index kept for data-* stability */
+      var localIdx = pageWins.indexOf(w);
       var frOpts = '<option value="">—</option>' + FACE_REC.map(function (o) { return opt(o, w.faceRec); }).join("");
       var custom = !!w.fabricCustom;
-      // fabric + colour: dropdowns, or text boxes when "one-off" is ticked
       var fabricCell, colourCell;
       if (custom) {
         fabricCell = '<input class="fabtext" value="' + esc(w.fabric || "") + '" placeholder="Fabric" data-win="' + w.id + '" data-wf="fabric">';
@@ -1831,18 +1875,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         var cOpts = '<option value="">—</option>' + fabricColours(w.fabric).map(function (c) { return opt(c, w.fabricColour); }).join("");
         colourCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="fabricColour"' + (w.fabric ? "" : " disabled") + '>' + cOpts + '</select>';
       }
-      // baserail + colour (always dropdowns)
       var bOpts = '<option value="">—</option>' + fabricSettings.baserails.map(function (b) { return opt(b.type, w.baserail); }).join("");
       var baserailCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="baserail">' + bOpts + '</select>';
       var bcOpts = '<option value="">—</option>' + baserailColours(w.baserail).map(function (c) { return opt(c, w.baserailColour); }).join("");
       var baserailColourCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="baserailColour"' + (w.baserail ? "" : " disabled") + '>' + bcOpts + '</select>';
-      // roll direction
       var rollOpts = '<option value="">—</option>' + ["OR", "UR"].map(function (o) { return opt(o, w.roll); }).join("");
       var rollCell = '<select class="rollsel" data-win="' + w.id + '" data-wf="roll">' + rollOpts + '</select>';
-      // hand (left / right)
       var handOpts = '<option value="">—</option>' + ["LH", "RH"].map(function (o) { return opt(o, w.hand); }).join("");
       var handCell = '<select class="rollsel" data-win="' + w.id + '" data-wf="hand">' + handOpts + '</select>';
-      // special-window options (pick one): Linked / E6 Motor / Linked + E6 Motor
       var specialCell;
       if (w.special) {
         var st = w.specialType || "linked";
@@ -1860,7 +1900,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       } else {
         specialCell = '<span class="dim">—</span>';
       }
-      return '<tr' + (w.special ? ' class="specialrow"' : '') + '><td class="idx">' + (i + 1) + (w.special ? '<span class="sptag">S</span>' : '') + '</td>' +
+      return '<tr' + (w.special ? ' class="specialrow"' : '') + '><td class="idx">' + (localIdx + 1) + (w.special ? '<span class="sptag">S</span>' : '') + '</td>' +
         '<td><input value="' + esc(w.name || "") + '" placeholder="Window name" data-win="' + w.id + '" data-wf="name"></td>' +
         '<td><select class="frsel" data-win="' + w.id + '" data-wf="faceRec">' + frOpts + '</select></td>' +
         '<td><input class="mono num narrow" type="number" value="' + esc(w.width || "") + '" data-win="' + w.id + '" data-wf="width"></td>' +
@@ -1876,13 +1916,23 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '<td>' + specialCell + '</td>' +
         '<td class="rowact"><button class="btn small danger-ghost" data-del-win="' + w.id + '">✕</button></td></tr>';
     }).join("");
-    var canAdd = job.windows.length < MAX_WINDOWS;
-    return '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th>Hand</th><th>Special</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '<div class="entryfoot"><div class="addbtns"><button class="btn ' + (canAdd ? "primary" : "disabled") + '" data-action="addwin" ' + (canAdd ? "" : "disabled") + '>+ Add window</button>' +
-      '<button class="btn ' + (canAdd ? "" : "disabled") + '" data-action="addspecialwin" ' + (canAdd ? "" : "disabled") + '>+ Add Special Window</button></div>' +
-      '<span class="count">' + job.windows.length + ' / ' + MAX_WINDOWS + ' windows</span></div></div>' +
+    /* page tabs */
+    var pageTabs = "";
+    for (var pnum = 1; pnum <= total; pnum++) {
+      pageTabs += '<button class="pagetab ' + (pnum === cur ? "on" : "") + '" data-winpage="' + pnum + '">' + esc(pageLabel(pnum, total)) + '</button>';
+    }
+    pageTabs += '<button class="pagetab addpage" data-addpage="1" title="Add another page">+ Page</button>';
+    var onPageCount = pageWins.length;
+    var pageFull = onPageCount >= WINDOWS_PER_PAGE;
+    return '<div class="pagetabs">' + pageTabs + '</div>' +
+      '<div class="card"><div class="tablescroll"><table class="grid entry winentry"><thead><tr><th class="idx">#</th><th>Window name</th><th>Face/Rec</th><th>Width</th><th>Drop</th><th>Fabric</th><th>Colour</th><th>One-off</th><th>Baserail</th><th>BR colour</th><th>Roll</th><th>Hand</th><th>Special</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="entryfoot"><div class="addbtns">' +
+      '<button class="btn ' + (pageFull ? "disabled" : "primary") + '" data-action="addwin" ' + (pageFull ? "disabled" : "") + '>+ Add window</button>' +
+      '<button class="btn ' + (pageFull ? "disabled" : "") + '" data-action="addspecialwin" ' + (pageFull ? "disabled" : "") + '>+ Add Special Window</button></div>' +
+      '<span class="count">' + onPageCount + ' / ' + WINDOWS_PER_PAGE + ' on this page' + (total > 1 ? ' \u00b7 ' + job.windows.length + ' total' : '') + '</span></div></div>' +
+      (pageFull ? '<p class="hint" style="color:#8a5a05">This page is full (' + WINDOWS_PER_PAGE + ' blinds). Use <b>+ Page</b> above to start another page.</p>' : '') +
       addonsPanel(job) +
-      '<p class="hint">Pick <b>Face / Make</b> or <b>Rec / Tight</b> for every window. <b>Special Windows</b> (marked <span class="sptag">S</span>) use a different width allowance \u2014 tick Linked, E6 Motor, or Linked + E6 Motor.</p>';
+      '<p class="hint">Pages group blinds for the assembly line (e.g. blockout on one page, sunscreen on the next). Cut lists and labels print each page separately; pricing totals everything together.</p>';
   }
   function jobAddons(job) { return Array.isArray(job.addons) ? job.addons : []; }
   function addonsPanel(job) {
@@ -2103,7 +2153,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
-      '<div class="ruleline">Cloth width: Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 (LF / Sheer fabrics or Lathe (No. 1 Pocket) baserail: + 400) · Tube = cloth width · Baserail = cloth width + 2 · Spring Assist when ordered width × drop is over ' + SPRING_ASSIST_AREA + ' m²</div>';
+      '<div class="ruleline">Cloth width: Face / Make = width − 26 · Rec / Tight = width − 28 · Cloth drop = drop + 250 (LF / Sheer fabrics or Lathe (No. 1 Pocket) baserail: + 400) · Tube = cloth width · Baserail = cloth width + 2 (Lathe (No. 1 Pocket): cloth width − 5) · Spring Assist when ordered width × drop is over ' + SPRING_ASSIST_AREA + ' m²</div>';
   }
   function labelsTab(job) {
     var ws = activeWindows(job);
@@ -2158,6 +2208,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div class="lbl-foot">' + esc(coFootLine()) + '</div>' +
       '</div></div>';
   }
+  /* Cut list: each page's block prints on its own sheet (page break between). */
+  var CUTLIST_PAGE_CSS =
+    "@media print{@page{size:A4;margin:14mm}" +
+    "#printRoot .cutsheet{page-break-after:always;break-after:page}" +
+    "#printRoot .cutsheet:last-child{page-break-after:avoid;break-after:avoid}}";
   /* Avery L7565 (8-up, 99.1x67.7): 2 cols x 4 rows.
      The top/side offset goes on @page margin (not grid padding) so EVERY page
      starts at the same position — otherwise page 2 onward would sit too high. */
@@ -2182,16 +2237,32 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     return pages.join("");
   }
   function printBlindLabels(job) {
-    var ws = activeWindows(job), client = getClient(job.clientId), cn = client ? client.name : "";
-    /* order label first, then one label per blind */
-    var cells = [orderLabelHTML(job, cn, ws.length)].concat(
-      ws.map(function (w, i) { return blindLabelHTML(job, w, i, cn, ws.length); }));
-    doPrint(paginateLabels(cells, 8), LARGE_PAGE_CSS);   /* 8 large labels per A4 (L7565) */
+    var client = getClient(job.clientId), cn = client ? client.name : "";
+    var total = pageCount(job);
+    var allWs = activeWindows(job);
+    var sheetsHTML = "";
+    /* order label first, on its own leading sheet */
+    sheetsHTML += paginateLabels([orderLabelHTML(job, cn, allWs.length)], 8);
+    /* then each window page's blind labels, each page starting on a fresh sheet */
+    for (var pg = 1; pg <= total; pg++) {
+      var ws = activeWindowsOnPage(job, pg);
+      if (!ws.length) continue;
+      var cells = ws.map(function (w, i) { return blindLabelHTML(job, w, i, cn, ws.length); });
+      sheetsHTML += paginateLabels(cells, 8);
+    }
+    doPrint(sheetsHTML, LARGE_PAGE_CSS);   /* 8 large labels per A4 (L7565) */
   }
   function printTubeLabels(job) {
-    var ws = activeWindows(job), client = getClient(job.clientId), cn = client ? client.name : "";
-    var cells = ws.map(function (w, i) { return tubeLabelHTML(job, w, i, cn); });
-    doPrint(paginateLabels(cells, 21), SMALL_PAGE_CSS);  /* 21 small labels per A4 (L7651) */
+    var client = getClient(job.clientId), cn = client ? client.name : "";
+    var total = pageCount(job);
+    var sheetsHTML = "";
+    for (var pg = 1; pg <= total; pg++) {
+      var ws = activeWindowsOnPage(job, pg);
+      if (!ws.length) continue;
+      var cells = ws.map(function (w, i) { return tubeLabelHTML(job, w, i, cn); });
+      sheetsHTML += paginateLabels(cells, 21);
+    }
+    doPrint(sheetsHTML, SMALL_PAGE_CSS);  /* 21 small labels per A4 (L7651) */
   }
 
 
@@ -2751,7 +2822,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Opening a job", a: "Press the \u201CEdit\u201D button on the left of any job row to open it. Inside a job you'll find tabs: Job info, Windows, Cloth cut list, Labels and Pricing." },
         { q: "What the columns mean", a: "SAN Ref is the job's reference number. Job is its name. Client and Address show who and where. Stage is how far along it is (tap the coloured box to change it). Expected is the completion date the program works out for you." },
         { q: "Changing a job's stage", a: "Tap the coloured stage box on the job's row and pick the new stage (for example, \u201CIn Production\u201D or \u201CItem on Order\u201D). The colour changes to match. This is how you track progress." },
-        { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
+        { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "The job stages", a: "The stages, in order, are: Not Started, In Production, Item on Order, Delayed, On Hold, Blinds Ready, Invoiced, Finalised, Cancelled. \u201CFinalised\u201D is the finished state \u2014 those jobs tuck away under \u201CShow completed\u201D. Ticking the Invoiced box on a job also moves its stage to \u201CInvoiced\u201D automatically." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
         { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
         { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
         { q: "Deleting a job", a: "The trash-can icon on the right of a job row deletes it. Be careful \u2014 this can't be undone. Only delete a job if it was entered by mistake." }
@@ -2760,13 +2831,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     {
       id: "windows", icon: "\u{1FA9F}", title: "Windows & blinds",
       items: [
-        { q: "Adding windows to a job", a: "Open the job and go to the Windows tab. Press \u201C+ Add window\u201D for each blind. Give it a name (e.g. \u201CBed 4\u201D), choose Face / Make or Rec / Tight, and type the ordered width and drop in millimetres." },
+        { q: "Window pages (multiple pages of blinds)", a: "The Windows tab can have several pages \u2014 for example blockout blinds on Page 1 and sunscreen on Page 2, which helps on the assembly line. Use the page tabs at the top to switch pages, and \u201C+ Page\u201D to add one. Each page holds up to 20 blinds; once a page is full, start a new one. When you print, the cut list and labels split each page onto its own sheet(s), while the pricing totals every page together as one running total." }, { q: "Adding windows to a job", a: "Open the job and go to the Windows tab. Press \u201C+ Add window\u201D for each blind. Give it a name (e.g. \u201CBed 4\u201D), choose Face / Make or Rec / Tight, and type the ordered width and drop in millimetres." },
         { q: "Face / Make vs Rec / Tight", a: "This tells the program how to work out the cloth size (Face takes off 26mm, Rec takes off 28mm). Always pick one for every window, or the cut list can't calculate correctly." },
         { q: "Choosing fabric and colour", a: "Pick the fabric from the drop-down, then the colour box shows only that fabric's colours. Do the same for the baserail. These come from the Fabrics tab \u2014 if something's missing, it needs adding there." },
         { q: "A one-off fabric that isn't in the list", a: "Tick the \u201Cone-off\u201D box on that window and the fabric and colour boxes become free text, so you can type anything for a special order." },
         { q: "Overrolled or Underrolled", a: "Use the Roll drop-down to choose OR (overrolled) or UR (underrolled) for each blind." },
         { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these, and the cut list updates automatically. IMPORTANT: these options only set the cut size \u2014 the hardware itself must still be added in the Add-ons section below (a linking bracket for Linked, the motor for E6, both for Linked + E6). A reminder shows on the window, and the type is shown on the cut list and the pricing so it can be checked at invoicing. A special window is marked with a small purple \u201CS\u201D." },
-        { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack." }, { q: "Lathe (No. 1 Pocket) baserail (price)", a: "As well as the extra drop, choosing the Lathe (No. 1 Pocket) baserail adds 25% to that blind\u2019s price. The 25% is worked out after the client\u2019s discount, and the line is tagged \u201C+25% Lathe\u201D on the pricing screen and printout." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
+        { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack. It also cuts the baserail 5mm shorter than usual (cloth width − 5 instead of + 2), and adds 25% to the price." }, { q: "Lathe (No. 1 Pocket) baserail (price)", a: "As well as the extra drop, choosing the Lathe (No. 1 Pocket) baserail adds 25% to that blind\u2019s price. The 25% is worked out after the client\u2019s discount, and the line is tagged \u201C+25% Lathe\u201D on the pricing screen and printout." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
         { q: "Labels", a: "The Labels tab has two buttons. \u201CPrint blind labels\u201D makes one large sheet with the ORDER label first (bordered, with a large job name and address so blinds are easy to find on the shelf), then one label per blind. \u201CPrint tube labels\u201D makes one small label per blind with the tube length. Blind labels use Avery L7565 (8 per A4); tube labels use Avery L7651 (21 per A4). IMPORTANT: set the print scale to Actual size / 100% (not fit to page) so labels line up. The Hand (LH / RH) on the blind label comes from the Hand column on the Windows tab." }
       ]
@@ -3223,22 +3294,33 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   window.addEventListener("afterprint", function () { document.body.classList.remove("printing"); printRoot().innerHTML = ""; });
   function printCloth(job) {
-    var client = getClient(job.clientId), ws = activeWindows(job);
-    var rows = ws.map(function (w, i) {
-      var spring = needsSpringAssist(w) ? "Spring Assist" : "";
-      return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") +
-        '</td><td>' + esc(specialLabel(w)) +
-        '</td><td class="pshade">' + mm(windowTubeLength(w)) +
-        '</td><td>' + esc(fabricSummary(w) || "") +
-        '</td><td class="pshade">' + mm(windowClothWidth(w)) +
-        '</td><td class="pshade">' + mm(windowClothDrop(w)) +
-        '</td><td>' + esc(baserailSummary(w) || "") +
-        '</td><td class="pshade">' + mm(windowBaserail(w)) +
-        '</td><td class="p-spring">' + spring + '</td></tr>';
-    }).join("");
-    doPrint('<div class="p-cut"><div class="p-head"><h2>Cloth Cut List</h2><div class="p-meta"><div><b>' + esc(job.jobName || "") + '</b></div><div>' +
-      esc(client ? client.name : "") + ' · ' + esc(job.sanRef || "") + ' · ' + esc(job.clientRef || "") + '</div><div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
-      '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Special</th><th class="pshade">Tube length</th><th>Fabric / colour</th><th class="pshade">Cloth width</th><th class="pshade">Cloth drop</th><th>Baserail type / colour</th><th class="pshade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+    var client = getClient(job.clientId);
+    var total = pageCount(job);
+    function cutRows(ws) {
+      return ws.map(function (w, i) {
+        var spring = needsSpringAssist(w) ? "Spring Assist" : "";
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") +
+          '</td><td>' + esc(specialLabel(w)) +
+          '</td><td class="pshade">' + mm(windowTubeLength(w)) +
+          '</td><td>' + esc(fabricSummary(w) || "") +
+          '</td><td class="pshade">' + mm(windowClothWidth(w)) +
+          '</td><td class="pshade">' + mm(windowClothDrop(w)) +
+          '</td><td>' + esc(baserailSummary(w) || "") +
+          '</td><td class="pshade">' + mm(windowBaserail(w)) +
+          '</td><td class="p-spring">' + spring + '</td></tr>';
+      }).join("");
+    }
+    var head = '<table class="p-grid"><thead><tr><th>#</th><th>Window</th><th>Special</th><th class="pshade">Tube length</th><th>Fabric / colour</th><th class="pshade">Cloth width</th><th class="pshade">Cloth drop</th><th>Baserail type / colour</th><th class="pshade">Baserail (mm)</th><th>Oversize</th></tr></thead><tbody>';
+    var sheets = [];
+    for (var pg = 1; pg <= total; pg++) {
+      var ws = activeWindowsOnPage(job, pg);
+      if (!ws.length && total > 1) continue;   /* skip empty extra pages */
+      var pageTag = total > 1 ? ' · ' + esc(pageLabel(pg, total)) : "";
+      sheets.push('<div class="p-cut cutsheet"><div class="p-head"><h2>Cloth Cut List' + pageTag + '</h2><div class="p-meta"><div><b>' + esc(job.jobName || "") + '</b></div><div>' +
+        esc(client ? client.name : "") + ' · ' + esc(job.sanRef || "") + ' · ' + esc(job.clientRef || "") + '</div><div>Printed ' + fmtDate(new Date()) + '</div></div></div>' +
+        head + cutRows(ws) + '</tbody></table></div>');
+    }
+    doPrint(sheets.join(""), CUTLIST_PAGE_CSS);
   }
   /* ---------- toast ---------- */
   /* ---------- save status ---------- */
@@ -3275,7 +3357,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var r = await db.from("jobs").insert(row).select().single();
     if (r.error) { toast("Could not create job."); return; }
     jobs.unshift(toApp(r.data));
-    state.view = "job"; state.jobId = r.data.id; state.tab = "info"; render();
+    state.view = "job"; state.jobId = r.data.id; state.tab = "info"; state.winPage = 1; render();
   }
   async function deleteJob(id) {
     var j = getJob(id);
@@ -3610,13 +3692,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
       "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client]," +
       "[data-fabdel],[data-basedel],[data-fabcoladd],[data-basecoladd],[data-fabcoldel],[data-basecoldel]," +
-      "[data-fabtoggle],[data-basetoggle],[data-hwdel],[data-help-toggle]," +
+      "[data-fabtoggle],[data-basetoggle],[data-hwdel],[data-help-toggle],[data-winpage],[data-addpage]," +
       ".m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
     if (t.hasAttribute("data-go")) { state.view = t.getAttribute("data-go"); if (state.view === "dashboard") state.jobId = null; render(); }
     else if (t.hasAttribute("data-tab")) { state.tab = t.getAttribute("data-tab"); render(); }
-    else if (t.hasAttribute("data-edit")) { state.view = "job"; state.jobId = t.getAttribute("data-edit"); state.tab = "info"; render(); }
+    else if (t.hasAttribute("data-edit")) { state.view = "job"; state.jobId = t.getAttribute("data-edit"); state.tab = "info"; state.winPage = 1; render(); }
     else if (t.hasAttribute("data-link-client")) clientLinkDialog(t.getAttribute("data-link-client"));
     else if (t.hasAttribute("data-copy-link")) copyLink();
     else if (t.hasAttribute("data-newtoken")) regenerateToken(t.getAttribute("data-newtoken"));
@@ -3683,9 +3765,19 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     else if (t.hasAttribute("data-del-win")) {
       var job = getJob(state.jobId);
+      var cp = state.winPage || 1;
       job.windows = job.windows.filter(function (x) { return x.id !== t.getAttribute("data-del-win"); });
-      if (!job.windows.length) job.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "" });
+      /* keep at least one blank window on the current page */
+      if (!windowsOnPage(job, cp).length) job.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "", page: cp });
       saveWindows(job); render();
+    }
+    else if (t.hasAttribute("data-winpage")) { state.winPage = +t.getAttribute("data-winpage"); render(); }
+    else if (t.hasAttribute("data-addpage")) {
+      var jp = getJob(state.jobId);
+      var newPage = pageCount(jp) + 1;
+      jp.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "", page: newPage });
+      state.winPage = newPage;
+      saveWindows(jp); render();
     }
     else if (t.hasAttribute("data-ao-del")) {
       var jobD = getJob(state.jobId);
@@ -3706,8 +3798,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var a = t.getAttribute("data-action");
       if (a === "newjob") newJob();
       else if (a === "newclient") newClient();
-      else if (a === "addwin") { var jb = getJob(state.jobId); if (jb.windows.length < MAX_WINDOWS) { jb.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "" }); saveWindows(jb); render(); } }
-      else if (a === "addspecialwin") { var jbs = getJob(state.jobId); if (jbs.windows.length < MAX_WINDOWS) { jbs.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "", special: true, specialType: "linked" }); saveWindows(jbs); render(); } }
+      else if (a === "addwin") { var jb = getJob(state.jobId); var cp = state.winPage || 1; if (windowsOnPage(jb, cp).length < WINDOWS_PER_PAGE) { jb.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "", page: cp }); saveWindows(jb); render(); } }
+      else if (a === "addspecialwin") { var jbs = getJob(state.jobId); var cps = state.winPage || 1; if (windowsOnPage(jbs, cps).length < WINDOWS_PER_PAGE) { jbs.windows.push({ id: uid(), name: "", faceRec: "", width: "", drop: "", page: cps, special: true, specialType: "linked" }); saveWindows(jbs); render(); } }
       else if (a === "addon-add") { var ja = getJob(state.jobId); if (!Array.isArray(ja.addons)) ja.addons = []; ja.addons.push({ id: "", qty: 1, target: "job", cat: t.getAttribute("data-cat") || "Blind hardware" }); saveAddons(ja); render(); }
       else if (a === "clientview") { state.clientView = t.checked; render(); }
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
@@ -3827,8 +3919,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.hasAttribute("data-job-field") && el.getAttribute("data-job-field") === "invoiced") {
       job.invoiced = !!el.checked;
       queueJobPatch(job.id, "invoiced", job.invoiced);
-      if (!job.invoiced) { job.invoiceNo = ""; queueJobPatch(job.id, "invoice_no", ""); }
-      render();   /* enable/disable the invoice-number box */
+      if (job.invoiced) {
+        /* ticking Invoiced also moves the job's stage to "Invoiced" */
+        if (job.status !== "Invoiced" && job.status !== "Finalised") {
+          job.status = "Invoiced"; queueJobPatch(job.id, "status", "Invoiced");
+        }
+      } else {
+        job.invoiceNo = ""; queueJobPatch(job.id, "invoice_no", "");
+      }
+      render();   /* enable/disable the invoice-number box, refresh the stage */
       return;
     }
     if (el.hasAttribute("data-job-field") && el.getAttribute("data-job-field") === "invoiceNo") {
@@ -3852,7 +3951,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (jb) {
         jb.invoiced = !!el.checked;
         queueJobPatch(jb.id, "invoiced", jb.invoiced);
-        if (!jb.invoiced) { jb.invoiceNo = ""; queueJobPatch(jb.id, "invoice_no", ""); }
+        if (jb.invoiced) {
+          if (jb.status !== "Invoiced" && jb.status !== "Finalised") {
+            jb.status = "Invoiced"; queueJobPatch(jb.id, "status", "Invoiced");
+          }
+        } else {
+          jb.invoiceNo = ""; queueJobPatch(jb.id, "invoice_no", "");
+        }
         render();
       }
       return;
