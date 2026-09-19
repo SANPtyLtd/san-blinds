@@ -2205,10 +2205,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function clothLabelHTML(job, w, i, clientName) {
     var cw = windowClothWidth(w), cd = windowClothDrop(w);
     var size = (cw !== null && cd !== null) ? (mm(cw) + " x " + mm(cd) + "d") : "";
+    var roll = w.roll === "OR" ? "OR" : w.roll === "UR" ? "UR" : "";
     return '<div class="lbl lbl-sm">' +
       '<div class="lbl-client2">' + esc(clientName) + '</div>' +
       '<div class="lbl-job2 clothjob">' + esc(job.jobName || "") + '</div>' +
-      '<div class="lbl-tube mono">Cloth: ' + esc(size) + '</div>' +
+      '<div class="lbl-tube mono">Cloth: ' + esc(size) + (roll ? '  \u00b7  ' + roll : '') + '</div>' +
       '</div>';
   }
   /* ---- Order label (large, one per order — visually distinct, prints first) ---- */
