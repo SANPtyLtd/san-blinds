@@ -453,6 +453,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .ao-pick input{margin:0}
 .ao-pagedivider{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:700;padding:8px 8px 3px;border-top:1px solid var(--line);margin-top:3px}
 .ao-pagedivider:first-of-type{border-top:0;margin-top:0}
+.ao-extras{display:flex;align-items:center;gap:8px;padding:8px 8px 4px;margin-top:4px;border-top:1px solid var(--line);font-size:13px;color:var(--dim)}
+.ao-extras input{width:56px;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-family:inherit;font-size:13.5px;text-align:right}
 .discrow.special.on{background:#f6f2fe;border-radius:8px}
 .specinput{display:inline-flex;align-items:center;gap:0}
 .spectoggle{width:30px;height:34px;border:1px solid var(--line);border-right:0;border-radius:8px 0 0 8px;background:#f3f5f7;cursor:pointer;font-weight:700;font-size:14px;color:#516072}
@@ -1952,29 +1954,42 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function jobAddons(job) { return Array.isArray(job.addons) ? job.addons : []; }
   /* An add-on's targets: an array of window IDs, or ["job"] for the whole job.
-     Migrates the old single `target` string to the new `targets` array. */
+     Migrates the old single `target` string to the new `targets` array.
+     An empty array means "nothing selected yet" (NOT whole job). */
   function addonTargets(a) {
     if (Array.isArray(a.targets)) return a.targets;
-    if (a.target === "job" || !a.target) return ["job"];
-    return [a.target];
+    if (a.target === "job") return ["job"];
+    if (a.target) return [a.target];
+    return ["job"];   /* brand-new add-on with no target yet defaults to whole job */
   }
   function isWholeJobAddon(a) {
-    var t = addonTargets(a);
-    return t.indexOf("job") !== -1 || t.length === 0;
+    return addonTargets(a).indexOf("job") !== -1;
+  }
+  /* Count of blinds an add-on covers (ticked blinds, or all blinds for whole-job). */
+  function addonBlindCount(job, a) {
+    if (isWholeJobAddon(a)) return activeWindows(job).length;
+    return addonTargets(a).filter(function (x) { return x !== "job"; }).length;
+  }
+  /* Auto quantity = blinds covered + extras (spares). Minimum 1. */
+  function autoQty(job, a) {
+    var extras = Math.max(0, parseInt(a.extras, 10) || 0);
+    return Math.max(1, addonBlindCount(job, a) + extras);
   }
   /* Human summary of what an add-on applies to (for the pricing screen + collapsed button). */
   function addonAppliesLabel(job, a) {
-    if (isWholeJobAddon(a)) return "Whole job";
-    var t = addonTargets(a);
+    var extras = Math.max(0, parseInt(a.extras, 10) || 0);
+    var extraTxt = extras ? " + " + extras + " spare" + (extras === 1 ? "" : "s") : "";
+    if (isWholeJobAddon(a)) return "Whole job" + extraTxt;
+    var t = addonTargets(a).filter(function (x) { return x !== "job"; });
     var names = t.map(function (wid) {
       var wi = -1;
       (job.windows || []).forEach(function (w, k) { if (w.id === wid) wi = k; });
       var wobj = (job.windows || []).filter(function (w) { return w.id === wid; })[0];
       return wobj ? ((wi + 1) + ". " + ((wobj.name || "").trim() || ("Window " + (wi + 1)))) : null;
     }).filter(Boolean);
-    if (!names.length) return "Whole job";
-    if (names.length <= 2) return names.join(", ");
-    return names.length + " blinds";
+    if (!names.length) return extras ? (extras + " spare" + (extras === 1 ? "" : "s")) : "None selected";
+    var blindPart = names.length <= 2 ? names.join(", ") : (names.length + " blinds");
+    return blindPart + extraTxt;
   }
   function addonsPanel(job) {
     var items = hardwareSettings.items;
@@ -2000,11 +2015,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var open = aoOpen[i] === true;
       var targets = addonTargets(a);
       var wholeOn = isWholeJobAddon(a);
+      var extras = Math.max(0, parseInt(a.extras, 10) || 0);
       var body = "";
       if (open) {
         body += '<div class="ao-picklist">';
-        /* Whole job tick at the top */
-        body += '<label class="ao-pick whole' + (wholeOn ? " on" : "") + '"><input type="checkbox" data-ao-whole="' + i + '"' + (wholeOn ? " checked" : "") + '><span>Whole job</span></label>';
         /* blinds grouped by page, with a divider between pages */
         var total = pageCount(job);
         for (var pnum = 1; pnum <= total; pnum++) {
@@ -2018,6 +2032,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
             return '<label class="ao-pick' + (on ? " on" : "") + '"><input type="checkbox" data-ao-blind="' + i + '" data-wid="' + esc(w.id) + '"' + (on ? " checked" : "") + (wholeOn ? " disabled" : "") + '><span>' + esc(lbl) + '</span></label>';
           }).join("");
         }
+        /* Whole job tick at the BOTTOM */
+        body += '<label class="ao-pick whole' + (wholeOn ? " on" : "") + '"><input type="checkbox" data-ao-whole="' + i + '"' + (wholeOn ? " checked" : "") + '><span>Whole job</span></label>';
+        /* Extras (spares) — added on top of the ticked blinds */
+        body += '<div class="ao-extras">Extras (spares) <input type="number" inputmode="numeric" min="0" value="' + esc(extras || "") + '" placeholder="0" data-ao-extras="' + i + '"></div>';
         body += '</div>';
       }
       return '<span class="ao-target"><button type="button" class="ao-targbtn' + (open ? " open" : "") + '" data-ao-toggletarget="' + i + '">' +
@@ -2033,7 +2051,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           ? '<span class="ao-name">' + esc(item.name) + '</span>'
           : '<select class="ao-item" data-ao-item="' + i + '">' + itemOptsFor(cat, a.id) + '</select>';
         return '<div class="ao-row">' + nameCell +
-          '<span class="ao-qty">Qty <input type="number" inputmode="numeric" min="1" value="' + esc(a.qty || 1) + '" data-ao-qty="' + i + '"></span>' +
+          '<span class="ao-qty">Qty <input type="number" inputmode="numeric" min="1" value="' + esc(a.qtyManual ? (a.qty || autoQty(job, a)) : autoQty(job, a)) + '" data-ao-qty="' + i + '"></span>' +
           targetPicker(a, i) +
           '<button class="iconbtn del" data-ao-del="' + i + '" title="Remove add-on" aria-label="Remove add-on">\u{1F5D1}</button>' +
           '</div>';
@@ -4009,7 +4027,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (jN) { noteChanged(jN, el.value); jN.clientNote = el.value; queueJobPatch(jN.id, "client_note", el.value); }
       return;
     }
-    if (el.hasAttribute("data-ao-qty")) { var jq = getJob(state.jobId); var aq = jobAddons(jq)[+el.getAttribute("data-ao-qty")]; if (aq) { aq.qty = Math.max(1, parseInt(el.value, 10) || 1); saveAddons(jq); } return; }
+    if (el.hasAttribute("data-ao-qty")) { var jq = getJob(state.jobId); var aq = jobAddons(jq)[+el.getAttribute("data-ao-qty")]; if (aq) { aq.qty = Math.max(1, parseInt(el.value, 10) || 1); aq.qtyManual = true; saveAddons(jq); } return; }
     if (el.hasAttribute("data-hwname")) { ensureHardwareDraft().items[+el.getAttribute("data-hwname")].name = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-hwprice")) { ensureHardwareDraft().items[+el.getAttribute("data-hwprice")].price = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabname")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabname")].name = el.value; syncSavedTag(); return; }
@@ -4071,7 +4089,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       var jw = getJob(state.jobId); var aw = jobAddons(jw)[+el.getAttribute("data-ao-whole")];
       if (aw) {
         if (el.checked) { aw.targets = ["job"]; delete aw.target; }
-        else { aw.targets = []; delete aw.target; }  /* unticking whole job -> pick blinds */
+        else { aw.targets = []; delete aw.target; }  /* unticking whole job -> nothing selected */
+        aw.qty = autoQty(jw, aw); aw.qtyManual = false;
         saveAddons(jw); render();
       }
       return;
@@ -4085,7 +4104,17 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         if (el.checked) { if (pos === -1) cur.push(wid); }
         else { if (pos !== -1) cur.splice(pos, 1); }
         ab.targets = cur; delete ab.target;
+        ab.qty = autoQty(jbl, ab); ab.qtyManual = false;
         saveAddons(jbl); render();
+      }
+      return;
+    }
+    if (el.hasAttribute && el.hasAttribute("data-ao-extras")) {
+      var jx = getJob(state.jobId); var ax = jobAddons(jx)[+el.getAttribute("data-ao-extras")];
+      if (ax) {
+        ax.extras = Math.max(0, parseInt(el.value, 10) || 0);
+        ax.qty = autoQty(jx, ax); ax.qtyManual = false;
+        saveAddons(jx); render();
       }
       return;
     }
