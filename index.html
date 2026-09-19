@@ -210,7 +210,8 @@ select.statussel.s-purple{background:#ece3f7;color:#6b3fa0}
   .p-grid.pcut{font-size:11px}
   .p-grid.pcut th,.p-grid.pcut td{padding:5px 5px}
   .p-grid.pcut .p-num4{width:11mm;text-align:right;white-space:nowrap}
-  .p-grid.pcut .p-osz{width:16mm}
+  .p-grid.pcut .p-osz{width:20mm}
+  .p-grid.pcut .p-notes div{line-height:1.3}
   .p-labels{display:grid;grid-template-columns:1fr 1fr;gap:8mm}
   .p-labels .label{border:1.5px solid #000;page-break-inside:avoid}
 }
@@ -468,7 +469,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .dualyes{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#e0edfa;color:#215fa6}
 .cut th.shade,.cut td.shade{background:#eef3f6}
 .cut th.num4,.cut td.num4{width:56px;min-width:56px;text-align:right;white-space:nowrap}
-.cut th.osz,.cut td.osz{width:88px;min-width:88px}
+.cut th.osz,.cut td.osz{width:96px;min-width:96px}
+.notestack{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.notescell{vertical-align:middle}
 .cut tr:hover td.shade{background:#e6edf1}
 @media print{ .p-spring{color:#000;font-weight:700} .p-quote tr.pt-spring td{border-top:1px solid #bbb} .p-grid th.pshade,.p-grid td.pshade{background:#e9eef2 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact} }
 .pricegrid tr.unpriced td{background:#fff8e8;color:#8a5a05}
@@ -2219,9 +2222,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var ws = activeWindows(job);
     var rows = ws.map(function (w, i) {
       var cw = windowClothWidth(w);
-      var spring = needsSpringAssist(w) ? '<span class="springyes">Spring Assist</span>' : '<span class="dim">—</span>';
+      /* Notes column: stack Dual and Spring Assist flags (whichever apply) */
+      var notes = [];
+      if (w.dual) notes.push('<span class="dualyes">Dual</span>');
+      if (needsSpringAssist(w)) notes.push('<span class="springyes">Spring Assist</span>');
+      var notesCell = notes.length ? '<div class="notestack">' + notes.join("") + '</div>' : '<span class="dim">—</span>';
       var sp = w.special ? '<span class="spcell">' + esc(specialLabel(w)) + '</span>' : '<span class="dim">—</span>';
-      var dual = w.dual ? '<span class="dualyes">Dual</span>' : '<span class="dim">—</span>';
       return '<tr' + (w.special ? ' class="specialrow"' : '') + '><td class="mono">' + (i + 1) + '</td><td>' + esc(w.name || "") +
         '</td><td class="mono num4">' + esc(w.width || "") +
         '</td><td class="mono num4">' + esc(w.drop || "") +
@@ -2232,10 +2238,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         '</td><td class="mono shade num4">' + mm(windowClothDrop(w)) +
         '</td><td>' + esc(baserailSummary(w) || "—") +
         '</td><td class="mono shade num4">' + mm(windowBaserail(w)) +
-        '</td><td class="osz">' + dual + '</td>' +
-        '<td class="osz">' + spring + '</td></tr>';
+        '</td><td class="osz notescell">' + notesCell + '</td></tr>';
     }).join("");
-    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th class="num4">Width</th><th class="num4">Drop</th><th>Special</th><th class="shade num4">Tube</th><th>Fabric / colour</th><th class="shade num4">Cloth W</th><th class="shade num4">Cloth D</th><th>Baserail</th><th class="shade num4">B/rail mm</th><th class="osz">Dual</th><th class="osz">Oversize</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    var content = ws.length ? '<div class="tablescroll"><table class="grid cut"><thead><tr><th>#</th><th>Window</th><th class="num4">Width</th><th class="num4">Drop</th><th>Special</th><th class="shade num4">Tube</th><th>Fabric / colour</th><th class="shade num4">Cloth W</th><th class="shade num4">Cloth D</th><th>Baserail</th><th class="shade num4">B/rail mm</th><th class="osz">Notes</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty small"><p>No windows entered yet. Add windows on the <b>Windows</b> tab.</p></div>';
     return '<div class="card"><div class="cardbar"><div><b>Cloth cut list</b> <span class="dim">— ' + esc(job.jobName || "") + '</span></div>' +
       (ws.length ? '<button class="btn primary" data-action="print-cloth">Print cut list</button>' : "") + '</div>' + content + '</div>' +
@@ -2957,7 +2962,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "A one-off fabric that isn't in the list", a: "Tick the \u201Cone-off\u201D box on that window and the fabric and colour boxes become free text, so you can type anything for a special order." },
         { q: "Overrolled or Underrolled", a: "Use the Roll drop-down to choose OR (overrolled) or UR (underrolled) for each blind." },
         { q: "Special Windows (Linked / E6 Motor)", a: "Some blinds need a different width allowance. Press \u201C+ Add Special Window\u201D instead of \u201C+ Add window\u201D, fill it in the same way, then tick one of the three options: Linked, E6 Motor, or Linked + E6 Motor. The program cuts the cloth width a little differently for these, and the cut list updates automatically. IMPORTANT: these options only set the cut size \u2014 the hardware itself must still be added in the Add-ons section below (a linking bracket for Linked, the motor for E6, both for Linked + E6). A reminder shows on the window, and the type is shown on the cut list and the pricing so it can be checked at invoicing. A special window is marked with a small purple \u201CS\u201D." },
-        { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack. It also cuts the baserail 5mm shorter than usual (cloth width − 5 instead of + 2), and adds 25% to the price." }, { q: "Lathe (No. 1 Pocket) baserail (price)", a: "As well as the extra drop, choosing the Lathe (No. 1 Pocket) baserail adds 25% to that blind\u2019s price. The 25% is worked out after the client\u2019s discount, and the line is tagged \u201C+25% Lathe\u201D on the pricing screen and printout." }, { q: "Dual bracket indicator", a: "Each window has a \u201Cdual\u201D tickbox. Tick it if that blind has dual brackets \u2014 it then shows a \u201CDual\u201D flag on the cut list so the workshop can see it clearly. This is just an indicator; the dual brackets themselves are still added and priced in the Add-ons section." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
+        { q: "Lathe (No. 1 Pocket) baserail (extra drop)", a: "When the baserail \u201CLathe (No. 1 Pocket)\u201D is chosen on a window, the program adds 400mm to the cloth drop (instead of the usual 250mm), automatically. If a window has both this baserail and an LF / Sheer fabric, it still adds 400mm total \u2014 they don\u2019t stack. It also cuts the baserail 5mm shorter than usual (cloth width − 5 instead of + 2), and adds 25% to the price." }, { q: "Lathe (No. 1 Pocket) baserail (price)", a: "As well as the extra drop, choosing the Lathe (No. 1 Pocket) baserail adds 25% to that blind\u2019s price. The 25% is worked out after the client\u2019s discount, and the line is tagged \u201C+25% Lathe\u201D on the pricing screen and printout." }, { q: "Dual bracket indicator", a: "Each window has a \u201Cdual\u201D tickbox. Tick it if that blind has dual brackets \u2014 it then shows a \u201CDual\u201D flag in the Notes column on the cut list (alongside any Spring Assist flag) so the workshop can see it clearly. This is just an indicator; the dual brackets themselves are still added and priced in the Add-ons section." }, { q: "LF / Sheer fabrics (extra drop)", a: "Some sheer and light-filter fabrics need extra length. On the Fabrics tab these are ticked \u201CLF / Sheer\u201D. When you choose one of them for a window, the program automatically adds 400mm to the cloth drop on the cut list (instead of the usual 250mm) \u2014 you don't need to do anything, it just happens." },
         { q: "Cloth cut list", a: "The Cloth cut list tab shows the calculated cut sizes for the workshop \u2014 cloth width, cloth drop, tube length and baserail \u2014 plus the fabric, baserail and whether a Spring Assist is needed. Press \u201CPrint cut list\u201D for a paper copy." },
         { q: "Labels", a: "The Labels tab has three buttons. \u201CPrint blind labels\u201D makes one large sheet with the ORDER label first (bordered, with a large job name and address so blinds are easy to find on the shelf), then one label per blind (each showing the window name, size, and its \u201CPage X, blind N of M\u201D position on the sheet). \u201CPrint tube labels\u201D makes one small label per blind with the tube length. \u201CPrint cloth labels\u201D makes one small label per blind showing the client, job name and cloth size \u2014 internal labels stuck to each blind\u2019s cloth so assembly staff know which is which. Blind labels use Avery L7565 (8 per A4); tube labels use Avery L7651 (21 per A4). IMPORTANT: set the print scale to Actual size / 100% (not fit to page) so labels line up. The Hand (LH / RH) on the blind label comes from the Hand column on the Windows tab." }
       ]
@@ -3418,7 +3423,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var total = pageCount(job);
     function cutRows(ws) {
       return ws.map(function (w, i) {
-        var spring = needsSpringAssist(w) ? "Spring Assist" : "";
+        var notes = [];
+        if (w.dual) notes.push("Dual");
+        if (needsSpringAssist(w)) notes.push("Spring Assist");
+        var notesCell = notes.map(function (n) { return '<div>' + esc(n) + '</div>'; }).join("");
         return '<tr><td>' + (i + 1) + '</td><td>' + esc(w.name || "") +
           '</td><td class="p-num4">' + esc(w.width || "") +
           '</td><td class="p-num4">' + esc(w.drop || "") +
@@ -3429,11 +3437,10 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
           '</td><td class="pshade p-num4">' + mm(windowClothDrop(w)) +
           '</td><td>' + esc(baserailSummary(w) || "") +
           '</td><td class="pshade p-num4">' + mm(windowBaserail(w)) +
-          '</td><td class="p-osz">' + (w.dual ? "Dual" : "") + '</td>' +
-          '<td class="p-spring p-osz">' + spring + '</td></tr>';
+          '</td><td class="p-osz p-notes">' + notesCell + '</td></tr>';
       }).join("");
     }
-    var head = '<table class="p-grid pcut"><thead><tr><th>#</th><th>Window</th><th class="p-num4">Width</th><th class="p-num4">Drop</th><th>Special</th><th class="pshade p-num4">Tube</th><th>Fabric / colour</th><th class="pshade p-num4">Cloth W</th><th class="pshade p-num4">Cloth D</th><th>Baserail</th><th class="pshade p-num4">B/rail mm</th><th class="p-osz">Dual</th><th class="p-osz">Oversize</th></tr></thead><tbody>';
+    var head = '<table class="p-grid pcut"><thead><tr><th>#</th><th>Window</th><th class="p-num4">Width</th><th class="p-num4">Drop</th><th>Special</th><th class="pshade p-num4">Tube</th><th>Fabric / colour</th><th class="pshade p-num4">Cloth W</th><th class="pshade p-num4">Cloth D</th><th>Baserail</th><th class="pshade p-num4">B/rail mm</th><th class="p-osz">Notes</th></tr></thead><tbody>';
     var sheets = [];
     for (var pg = 1; pg <= total; pg++) {
       var ws = activeWindowsOnPage(job, pg);
