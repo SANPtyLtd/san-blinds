@@ -1680,6 +1680,57 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div class="cocontact">' + esc(COMPANY.address) + '<br>Ph ' + esc(COMPANY.phone) + ' · ' + esc(COMPANY.email) + '</div>' +
       '</div>';
   }
+  /* ---- Printable job lists (production run sheets) ---- */
+  var PRINT_LIST_CSS =
+    "@media print{@page{size:A4 landscape;margin:12mm}" +
+    "#printRoot .joblist{width:100%;border-collapse:collapse;font-size:11.5px}" +
+    "#printRoot .joblist th,#printRoot .joblist td{border:1px solid #333;padding:6px 8px;text-align:left;vertical-align:top}" +
+    "#printRoot .joblist th{background:#eee;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}" +
+    "#printRoot .joblist .c-notes{width:34mm}" +
+    "#printRoot .joblist .c-qty{width:14mm;text-align:center}" +
+    "#printRoot .joblist .c-exp{width:24mm;white-space:nowrap}" +
+    "#printRoot .joblist tr{page-break-inside:avoid}}";
+  function jobListRows(jobList) {
+    return jobList.map(function (j) {
+      var c = getClient(j.clientId);
+      var exp = expectedFor(j);
+      var qty = activeWindows(j).length;
+      return '<tr><td>' + esc(j.jobName || "") + '</td><td>' + esc(c ? c.name : "") + '</td>' +
+        '<td>' + esc(j.jobAddress || "") + '</td><td>' + esc(j.status || "") + '</td>' +
+        '<td class="c-qty">' + (qty || "") + '</td>' +
+        '<td class="c-exp">' + esc(fmtDate(exp.iso)) + '</td>' +
+        '<td class="c-notes"></td></tr>';
+    }).join("");
+  }
+  function printJobList(title, jobList) {
+    var head = '<div class="p-head"><h2>' + esc(title) + '</h2><div class="p-meta">' +
+      esc(COMPANY.name) + ' \u00b7 ' + jobList.length + ' job' + (jobList.length === 1 ? "" : "s") + ' \u00b7 Printed ' + fmtDate(new Date()) + '</div></div>';
+    var table = '<table class="joblist"><thead><tr><th>Job Name</th><th>Client</th><th>Address</th><th>Stage</th>' +
+      '<th class="c-qty">Blind Qty</th><th class="c-exp">Expected</th><th class="c-notes">Notes</th></tr></thead><tbody>' +
+      (jobList.length ? jobListRows(jobList) : '<tr><td colspan="7" style="text-align:center;color:#888">No jobs</td></tr>') +
+      '</tbody></table>';
+    doPrint('<div class="p-listwrap">' + head + table + '</div>', PRINT_LIST_CSS);
+  }
+  /* Active jobs only (exclude Finalised, Cancelled, Quote Rejected), sorted by expected date. */
+  function activeJobList() {
+    return jobs.filter(function (j) {
+      return j.status !== DONE_STATUS && REJECTED_STATUSES.indexOf(j.status) === -1;
+    }).sort(function (a, b) {
+      var ea = expectedFor(a).iso || "9999", eb = expectedFor(b).iso || "9999";
+      return ea < eb ? -1 : ea > eb ? 1 : 0;
+    });
+  }
+  function printAllJobs() { printJobList("All Active Jobs", activeJobList()); }
+  function printDueJobs() {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var cutoff = addWorkingDays(localISO(today), 10);   /* 10 working days ahead */
+    var cutoffISO = cutoff ? localISO(cutoff) : "";
+    var due = activeJobList().filter(function (j) {
+      var iso = expectedFor(j).iso;
+      return iso && cutoffISO && iso <= cutoffISO;   /* due on/before the 10-working-day mark (incl. overdue) */
+    });
+    printJobList("Jobs Due in the Next 10 Working Days", due);
+  }
   function renderDashboard() {
     var q = state.search.toLowerCase();
     var completedCount = jobs.filter(function (j) { return j.status === DONE_STATUS; }).length;
@@ -1738,6 +1789,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<label class="toggle"><input type="checkbox" data-action="showrejected" ' + (state.showRejected ? "checked" : "") + '><span>Rejected / Cancelled' + (rejectedCount ? " (" + rejectedCount + ")" : "") + '</span></label>' +
       '<label class="toggle"><input type="checkbox" data-action="clientview" ' + (state.clientView ? "checked" : "") + '><span>Client view</span></label>' +
       '<input class="search" placeholder="Search jobs or clients" value="' + esc(state.search) + '" data-search>' +
+      '<button class="btn" data-action="print-due">Print due (10 days)</button>' +
+      '<button class="btn" data-action="print-all">Print all jobs</button>' +
       '<button class="btn primary" data-action="newjob">New job</button></div></div>' +
       (jobs.length ? '<div class="card"><table class="grid dashgrid"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>' +
         (list.length ? "" : '<div class="nomatch">' + (q ? 'No jobs match “' + esc(state.search) + '”.' : (state.showRejected ? 'No rejected or cancelled jobs.' : (completedCount ? 'All jobs are completed — tick “Show completed” to view them.' : 'No jobs to show.'))) + '</div>') + '</div>'
@@ -2967,7 +3020,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "What the columns mean", a: "SAN Ref is the job's reference number. Job is its name. Client and Address show who and where. Stage is how far along it is (tap the coloured box to change it). Expected is the completion date the program works out for you." },
         { q: "Changing a job's stage", a: "Tap the coloured stage box on the job's row and pick the new stage (for example, \u201CIn Production\u201D or \u201CItem on Order\u201D). The colour changes to match. This is how you track progress." },
         { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "The job stages", a: "The stages, in order, are: Not Started, In Production, Item on Order, Delayed, On Hold, Blinds Ready, Invoiced, Finalised, Quote Rejected, Cancelled. \u201CFinalised\u201D is the finished state \u2014 those jobs tuck away under \u201CShow completed\u201D. Ticking the Invoiced box on a job also moves its stage to \u201CInvoiced\u201D automatically." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
-        { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
+        { q: "Printing a job list", a: "Two buttons at the top of the dashboard print run sheets: \u201CPrint due (10 days)\u201D lists jobs due within the next 10 working days (plus any overdue), and \u201CPrint all jobs\u201D lists every active job. Both show Job Name, Client, Address, Stage, Blind Qty, Expected date and a blank Notes column for handwritten notes, sorted by expected date. Finalised, cancelled and rejected jobs are left off." }, { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
         { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CRejected / Cancelled\u201D shows only jobs at those two stages (they\u2019re hidden from the normal list). \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
         { q: "Deleting a job", a: "The trash-can icon on the right of a job row deletes it. Be careful \u2014 this can't be undone. Only delete a job if it was entered by mistake." }
       ]
@@ -3954,6 +4007,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "clientview") { state.clientView = t.checked; render(); }
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
       else if (a === "showrejected") { state.showRejected = t.checked; render(); }
+      else if (a === "print-due") printDueJobs();
+      else if (a === "print-all") printAllJobs();
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
       else if (a === "print-pricing") printPricing(getJob(state.jobId));
       else if (a === "print-blind-labels") printBlindLabels(getJob(state.jobId));
