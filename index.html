@@ -362,6 +362,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 }
 .expcell{white-space:nowrap}
 .cvaddr{font-weight:400;font-size:12.5px;color:var(--dim);margin-top:3px;line-height:1.4}
+.turnaround{margin-top:14px;padding:10px 14px;background:#eef3f6;border-radius:10px;font-size:13.5px;color:#4a5763}
 .cvnote{font-weight:400;font-size:12.5px;color:#4a5763;background:#f0f7f2;border-radius:6px;padding:5px 8px;margin-top:5px;line-height:1.5}
 .invtick{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:30px;height:30px;box-sizing:border-box;
   border-radius:8px;font-weight:800;font-size:15px;margin-right:6px;vertical-align:middle}
@@ -1157,6 +1158,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       status: normStatus(r.status), notes: r.notes || "", clientNote: r.client_note || "", clientNoteAt: r.client_note_at || "",
       expectedOverride: r.expected_override || "",
       invoiced: !!r.invoiced, invoiceNo: r.invoice_no || "",
+      completedAt: r.completed_at || "",
       windows: Array.isArray(r.windows) ? r.windows : [],
       addons: Array.isArray(r.addons) ? r.addons : []
     };
@@ -1165,9 +1167,28 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     sanRef: "san_ref", clientRef: "client_ref", clientId: "client_id",
     jobName: "job_name", jobAddress: "job_address", dateReceived: "date_received",
     status: "status", notes: "notes", clientNote: "client_note", expectedOverride: "expected_override",
-    invoiced: "invoiced", invoiceNo: "invoice_no"
+    invoiced: "invoiced", invoiceNo: "invoice_no", completedAt: "completed_at"
   };
   function getJob(id) { return jobs.filter(function (j) { return j.id === id; })[0]; }
+  /* Change a job's status and manage the "invoiced date" stamp:
+     stamp completed_at when it becomes Invoiced, clear it if it moves back before Invoiced.
+     (Finalised keeps the date, since a job is finalised after being invoiced.) */
+  function applyStatusChange(job, newStatus) {
+    job.status = newStatus;
+    queueJobPatch(job.id, "status", newStatus);
+    if (newStatus === "Invoiced" || newStatus === "Finalised") {
+      if (!job.completedAt) { job.completedAt = todayISO(); queueJobPatch(job.id, "completed_at", job.completedAt); }
+    } else {
+      if (job.completedAt) { job.completedAt = ""; queueJobPatch(job.id, "completed_at", ""); }
+    }
+  }
+  /* Whole calendar days between two ISO dates (received -> invoiced). */
+  function daysBetween(fromISO, toISO) {
+    if (!fromISO || !toISO) return null;
+    var a = new Date(fromISO + "T00:00:00"), b = new Date(toISO + "T00:00:00");
+    if (isNaN(a) || isNaN(b)) return null;
+    return Math.round((b - a) / 86400000);
+  }
   function getClient(id) { return clients.filter(function (c) { return c.id === id; })[0]; }
   /* Expected completion: a manual date wins; otherwise count the
      client's lead time in working days, skipping holidays. */
@@ -1946,6 +1967,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<label class="fld invno' + (job.invoiced ? "" : " off") + '"><span>Invoice number</span>' +
       '<input value="' + esc(job.invoiceNo || "") + '" inputmode="numeric" maxlength="5" placeholder="5 digits" data-job-field="invoiceNo"' + (job.invoiced ? "" : " disabled") + '></label>' +
       '</div>' +
+      (job.completedAt
+        ? '<div class="turnaround">Invoiced <b>' + esc(fmtDate(job.completedAt)) + '</b>' +
+          (function () {
+            var d = daysBetween(job.dateReceived, job.completedAt);
+            return (d !== null) ? ' \u00b7 <b>' + d + ' day' + (d === 1 ? "" : "s") + '</b> from received to invoiced' : "";
+          })() + '</div>'
+        : "") +
       '<label class="fld wide"><span>Internal notes <span class="notetag staff">staff only</span></span>' +
       '<textarea rows="3" placeholder="Private — never shown to the client" data-job-field="notes">' + esc(job.notes || "") + '</textarea></label>' +
       '<label class="fld wide" style="margin-top:14px"><span>Client notes <span class="notetag client">visible to client</span></span>' +
@@ -3026,7 +3054,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Opening a job", a: "Press the \u201CEdit\u201D button on the left of any job row to open it. Inside a job you'll find tabs: Job info, Windows, Cloth cut list, Labels and Pricing." },
         { q: "What the columns mean", a: "SAN Ref is the job's reference number. Job is its name. Client and Address show who and where. Stage is how far along it is (tap the coloured box to change it). Expected is the completion date the program works out for you." },
         { q: "Changing a job's stage", a: "Tap the coloured stage box on the job's row and pick the new stage (for example, \u201CIn Production\u201D or \u201CItem on Order\u201D). The colour changes to match. This is how you track progress." },
-        { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "The job stages", a: "The stages, in order, are: Not Started, In Production, Item on Order, Delayed, On Hold, Blinds Ready, Invoiced, Finalised, Quote Rejected, Cancelled. \u201CFinalised\u201D is the finished state \u2014 those jobs tuck away under \u201CShow completed\u201D. Ticking the Invoiced box on a job also moves its stage to \u201CInvoiced\u201D automatically." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
+        { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "The job stages", a: "The stages, in order, are: Not Started, In Production, Item on Order, Delayed, On Hold, Blinds Ready, Invoiced, Finalised, Quote Rejected, Cancelled. \u201CFinalised\u201D is the finished state \u2014 those jobs tuck away under \u201CShow completed\u201D. Ticking the Invoiced box on a job also moves its stage to \u201CInvoiced\u201D automatically." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number. When a job first reaches the Invoiced stage the program records the date, and the Job info tab then shows the invoiced date and how many days it took from the date received." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
         { q: "Printing a job list", a: "Two buttons at the top of the dashboard print run sheets: \u201CPrint due (10 days)\u201D lists jobs due within the next 10 working days (plus any overdue), and \u201CPrint all jobs\u201D lists every active job. Both show Job Name, Client, Address, Stage, Blind Qty, Expected date and a blank Notes column for handwritten notes, sorted by expected date. Finalised, cancelled and rejected jobs are left off." }, { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
         { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CRejected / Cancelled\u201D shows only jobs at those two stages (they\u2019re hidden from the normal list). \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
         { q: "Deleting a job", a: "The trash-can icon on the right of a job row deletes it. Be careful \u2014 this can't be undone. Only delete a job if it was entered by mistake." }
@@ -4136,7 +4164,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       if (job.invoiced) {
         /* ticking Invoiced also moves the job's stage to "Invoiced" */
         if (job.status !== "Invoiced" && job.status !== "Finalised") {
-          job.status = "Invoiced"; queueJobPatch(job.id, "status", "Invoiced");
+          applyStatusChange(job, "Invoiced");
         }
       } else {
         job.invoiceNo = ""; queueJobPatch(job.id, "invoice_no", "");
@@ -4167,7 +4195,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         queueJobPatch(jb.id, "invoiced", jb.invoiced);
         if (jb.invoiced) {
           if (jb.status !== "Invoiced" && jb.status !== "Finalised") {
-            jb.status = "Invoiced"; queueJobPatch(jb.id, "status", "Invoiced");
+            applyStatusChange(jb, "Invoiced");
           }
         } else {
           jb.invoiceNo = ""; queueJobPatch(jb.id, "invoice_no", "");
@@ -4216,7 +4244,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.hasAttribute("data-exp-job")) { setExpectedOverride(el.getAttribute("data-exp-job"), el.value); return; }
     if (el.hasAttribute("data-exp-show")) { return; }
     if (el.hasAttribute("data-status-job")) {
-      var j = getJob(el.getAttribute("data-status-job")); if (j) { j.status = el.value; queueJobPatch(j.id, "status", el.value); render(); } return;
+      var j = getJob(el.getAttribute("data-status-job")); if (j) { applyStatusChange(j, el.value); render(); } return;
     }
     if (el.hasAttribute("data-q-ordered")) { setOrdered(el.getAttribute("data-q-ordered"), el.checked); return; }
     if (el.hasAttribute("data-q-orddate")) {
@@ -4271,7 +4299,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     var job = getJob(state.jobId); if (!job) return;
     if (el.hasAttribute("data-job-client")) { job.clientId = el.value || null; queueJobPatch(job.id, "client_id", job.clientId); render(); }
-    else if (el.getAttribute("data-job-field") === "status") { job.status = el.value; queueJobPatch(job.id, "status", el.value); render(); }
+    else if (el.getAttribute("data-job-field") === "status") { applyStatusChange(job, el.value); render(); }
     else if (el.getAttribute("data-job-field") === "dateReceived") { job.dateReceived = el.value; queueJobPatch(job.id, "date_received", el.value); render(); }
     else if (el.hasAttribute("data-win") && el.hasAttribute("data-sptype")) {
       var ws = job.windows.filter(function (x) { return x.id === el.getAttribute("data-win"); })[0];
