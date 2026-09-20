@@ -48,8 +48,16 @@ tr.done .jname{color:#9aa7b4;font-weight:600}
 .s-amber{background:#fbefd6;color:#996515} .s-orange{background:#fce3d4;color:#b1521f}
 .s-slate{background:#e7e9f4;color:#4b4f86} .s-red{background:#fbe0e0;color:#b12a2a}
 .s-green{background:#dcf3e4;color:#1d7a45}
+.s-teal{background:#d5f0ee;color:#0f6e66} .s-purple{background:#ece3f7;color:#6b3fa0}
 
 .note{margin:18px 2px 0;color:var(--dim);font-size:12.5px}
+.viewtoggle{display:flex;gap:8px;margin:0 0 14px}
+.vbtn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 16px;font-family:inherit;font-size:14px;font-weight:600;color:var(--dim);cursor:pointer}
+.vbtn:hover{background:#f5f8fa;color:var(--text)}
+.vbtn.on{background:var(--teal,#0f6e66);color:#fff;border-color:var(--teal,#0f6e66)}
+.jobref{font-weight:400;font-size:12.5px;color:var(--dim);margin-top:3px}
+.jobinv{font-weight:600;font-size:12.5px;color:#6b3fa0;margin-top:5px}
+.emptyrow{text-align:center;color:var(--dim);padding:22px 8px}
 .state{background:var(--surface);border:1px dashed var(--line);border-radius:14px;
   padding:44px 26px;text-align:center;color:var(--dim)}
 .state h2{margin:0 0 8px;color:var(--ink);font-size:19px}
@@ -91,8 +99,10 @@ tr.done .jname{color:#9aa7b4;font-weight:600}
 
   var STATUS_CLASS = {
     "Not Started": "s-grey", "In Production": "s-blue",
-    "Fabric / Product on Order": "s-amber", "Delayed": "s-orange",
-    "On Hold": "s-slate", "Cancelled": "s-red", "Job Complete": "s-green"
+    "Item on Order": "s-amber", "Delayed": "s-orange",
+    "On Hold": "s-slate", "Blinds Ready": "s-teal", "Invoiced": "s-purple",
+    "Finalised": "s-green", "Cancelled": "s-red",
+    "Fabric / Product on Order": "s-amber", "Job Complete": "s-green"
   };
 
   var main = document.getElementById("main");
@@ -119,24 +129,59 @@ tr.done .jname{color:#9aa7b4;font-weight:600}
 
   var COMPANY = { name: "SAN Pty Ltd", address: "55 Lampton Avenue, Derwent Park, TAS 7009", phone: "03 6272 3400", email: "admin@sanptyltd.com" };
 
-  function renderJobs(name, rows) {
-    var body = rows.map(function (r) {
-      var done = r.job_status === "Job Complete";
-      var note = (r.client_note || "").trim();
-      var addr = (r.job_address || "").trim();
-      return '<tr' + (done ? ' class="done"' : '') + '>' +
-        '<td class="jobcell jname">' + esc(r.job_name || "Job") +
-          (addr ? '<div class="jobaddr">' + esc(addr) + '</div>' : '') +
-          (note ? '<div class="jobnote">' + esc(note).replace(/\n/g, "<br>") + '</div>' : '') + '</td>' +
-        '<td data-label="Stage"><span class="badge ' + (STATUS_CLASS[r.job_status] || "s-grey") + '">' +
-          esc(r.job_status || "Not Started") + '</span></td>' +
-        '<td data-label="Expected completion" class="mono">' + esc(fmtDate(r.expected_completion)) + '</td>' +
-        '</tr>';
-    }).join("");
+  var FINALISED = "Finalised";
+  var allRows = [], clientName = "", portalView = "current";
+
+  function isFinalised(r) { return r.job_status === FINALISED || r.job_status === "Job Complete"; }
+
+  function jobRowHTML(r) {
+    var note = (r.client_note || "").trim();
+    var addr = (r.job_address || "").trim();
+    var ref = (r.client_ref || "").trim();
+    var inv = (r.invoice_no || "").trim();
+    var invDate = (r.invoiced_date || "").trim();
+    var invLine = inv
+      ? '<div class="jobinv">Invoice ' + esc(inv) + (invDate ? ' \u00b7 ' + esc(fmtDate(invDate)) : '') + '</div>'
+      : '';
+    return '<tr' + (isFinalised(r) ? ' class="done"' : '') + '>' +
+      '<td class="jobcell jname">' + esc(r.job_name || "Job") +
+        (ref ? '<div class="jobref">Ref: ' + esc(ref) + '</div>' : '') +
+        (addr ? '<div class="jobaddr">' + esc(addr) + '</div>' : '') +
+        (note ? '<div class="jobnote">' + esc(note).replace(/\n/g, "<br>") + '</div>' : '') +
+        invLine + '</td>' +
+      '<td data-label="Stage"><span class="badge ' + (STATUS_CLASS[r.job_status] || "s-grey") + '">' +
+        esc(r.job_status || "Not Started") + '</span></td>' +
+      '<td data-label="Expected completion" class="mono">' + esc(fmtDate(r.expected_completion)) + '</td>' +
+      '</tr>';
+  }
+
+  function renderJobs() {
+    var current = allRows.filter(function (r) { return !isFinalised(r); });
+    var finalised = allRows.filter(isFinalised);
+    /* Current: soonest expected first. Finalised: most recently invoiced first. */
+    current.sort(function (a, b) {
+      var ea = a.expected_completion || "9999", eb = b.expected_completion || "9999";
+      return ea < eb ? -1 : ea > eb ? 1 : 0;
+    });
+    finalised.sort(function (a, b) {
+      var da = a.invoiced_date || "", dbb = b.invoiced_date || "";
+      return da < dbb ? 1 : da > dbb ? -1 : 0;   /* newest invoiced first */
+    });
+    var rows = portalView === "finalised" ? finalised : current;
+    var body = rows.length
+      ? rows.map(jobRowHTML).join("")
+      : '<tr><td colspan="3" class="emptyrow">' +
+        (portalView === "finalised" ? "No finalised jobs yet." : "No current jobs \u2014 see finalised jobs above.") + '</td></tr>';
+
+    var toggle = '<div class="viewtoggle">' +
+      '<button class="vbtn ' + (portalView === "current" ? "on" : "") + '" data-view="current">Current jobs (' + current.length + ')</button>' +
+      '<button class="vbtn ' + (portalView === "finalised" ? "on" : "") + '" data-view="finalised">Finalised jobs (' + finalised.length + ')</button>' +
+      '</div>';
 
     main.innerHTML =
-      '<h1>' + esc(name) + '</h1>' +
-      '<p class="sub">' + rows.length + ' job' + (rows.length === 1 ? "" : "s") + ' with us</p>' +
+      '<h1>' + esc(clientName) + '</h1>' +
+      '<p class="sub">' + allRows.length + ' job' + (allRows.length === 1 ? "" : "s") + ' with us</p>' +
+      toggle +
       '<div class="card"><table>' +
       '<thead><tr><th>Job</th><th>Stage</th><th>Expected completion</th></tr></thead>' +
       '<tbody>' + body + '</tbody></table></div>' +
@@ -145,6 +190,12 @@ tr.done .jname{color:#9aa7b4;font-weight:600}
       'For anything urgent, please contact us directly.</p>' +
       '<footer class="cofoot"><b>' + esc(COMPANY.name) + '</b><br>' +
       esc(COMPANY.address) + '<br>Ph ' + esc(COMPANY.phone) + ' · ' + esc(COMPANY.email) + '</footer>';
+
+    /* wire the toggle buttons */
+    var btns = main.querySelectorAll("[data-view]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener("click", function () { portalView = this.getAttribute("data-view"); renderJobs(); });
+    }
   }
 
   async function start() {
@@ -179,12 +230,12 @@ tr.done .jname{color:#9aa7b4;font-weight:600}
           '<div class="state"><h2>No jobs yet</h2><p>Once a job is entered for you, it will appear here.</p></div>';
         return;
       }
-      renderJobs(who.data, rows);
+      allRows = rows; clientName = who.data; portalView = "current";
+      renderJobs();
     } catch (e) {
       state("Something went wrong", "We couldn’t load your jobs just now. Please try again shortly.");
     }
   }
-
   start();
 })();
 </script>
