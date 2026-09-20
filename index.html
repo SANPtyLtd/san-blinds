@@ -104,6 +104,7 @@ td.idx,.idx{color:var(--dim);width:34px;text-align:center;font-family:var(--mono
 .s-grey{background:#eef1f4;color:#516072} .s-blue{background:#e4eefb;color:#215fa6}
 .s-amber{background:#fbefd6;color:#996515} .s-orange{background:#fce3d4;color:#b1521f}
 .s-slate{background:#e7e9f4;color:#4b4f86} .s-red{background:#fbe0e0;color:#b12a2a}
+.s-rose{background:#f7e0ec;color:#9b2c62}
 .s-green{background:#dcf3e4;color:#1d7a45}
 .s-teal{background:#d5f0ee;color:#0f6e66} .s-purple{background:#ece3f7;color:#6b3fa0}
 select.statussel{border:0;font-weight:700;font-size:12.5px;padding:5px 8px;border-radius:999px;cursor:pointer;appearance:none;-webkit-appearance:none}
@@ -113,6 +114,7 @@ select.statussel.s-amber{background:#fbefd6;color:#996515}
 select.statussel.s-orange{background:#fce3d4;color:#b1521f}
 select.statussel.s-slate{background:#e7e9f4;color:#4b4f86}
 select.statussel.s-red{background:#fbe0e0;color:#b12a2a}
+select.statussel.s-rose{background:#f7e0ec;color:#9b2c62}
 select.statussel.s-green{background:#dcf3e4;color:#1d7a45}
 select.statussel.s-teal{background:#d5f0ee;color:#0f6e66}
 select.statussel.s-purple{background:#ece3f7;color:#6b3fa0}
@@ -1006,15 +1008,17 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function companyLine() { return COMPANY.name + " · " + COMPANY.address + " · Ph " + COMPANY.phone + " · " + COMPANY.email; }
 
   var STATUSES = ["Not Started", "In Production", "Item on Order",
-    "Delayed", "On Hold", "Blinds Ready", "Invoiced", "Finalised", "Cancelled"];
+    "Delayed", "On Hold", "Blinds Ready", "Invoiced", "Finalised", "Quote Rejected", "Cancelled"];
   var STATUS_CLASS = {
     "Not Started": "s-grey", "In Production": "s-blue",
     "Item on Order": "s-amber", "Delayed": "s-orange",
     "On Hold": "s-slate", "Blinds Ready": "s-teal", "Invoiced": "s-purple",
-    "Finalised": "s-green", "Cancelled": "s-red"
+    "Finalised": "s-green", "Quote Rejected": "s-rose", "Cancelled": "s-red"
   };
   /* The "done" state (hidden under Show completed, greyed row, no due-soon highlight). */
   var DONE_STATUS = "Finalised";
+  /* Dead-end statuses hidden from the normal list, shown only via the Rejected/Cancelled toggle. */
+  var REJECTED_STATUSES = ["Quote Rejected", "Cancelled"];
   /* Older jobs may have the previous label saved in the database.
      Map any retired names to their current one so nothing shows blank. */
   var STATUS_ALIASES = { "Fabric / Product on Order": "Item on Order", "Job Complete": "Finalised" };
@@ -1435,7 +1439,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       SUPABASE_URL.indexOf("PASTE_") === -1 && SUPABASE_KEY.indexOf("PASTE_") === -1;
   }
 
-  var state = { view: "dashboard", jobId: null, quoteId: null, tab: "info", winPage: 1, clientView: false, showCompleted: false, search: "", quoteSearch: "" };
+  var state = { view: "dashboard", jobId: null, quoteId: null, tab: "info", winPage: 1, clientView: false, showCompleted: false, showRejected: false, search: "", quoteSearch: "" };
 
   /* ---------- quoting ---------- */
   var MAX_QUOTE_WINDOWS = 30;
@@ -1679,8 +1683,17 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function renderDashboard() {
     var q = state.search.toLowerCase();
     var completedCount = jobs.filter(function (j) { return j.status === DONE_STATUS; }).length;
+    var rejectedCount = jobs.filter(function (j) { return REJECTED_STATUSES.indexOf(j.status) !== -1; }).length;
     var list = jobs.filter(function (j) {
-      if (!state.showCompleted && j.status === DONE_STATUS) return false;
+      var isRejected = REJECTED_STATUSES.indexOf(j.status) !== -1;
+      if (state.showRejected) {
+        /* "Rejected / Cancelled" view shows ONLY those jobs */
+        if (!isRejected) return false;
+      } else {
+        /* normal view hides rejected/cancelled always, and Finalised unless Show completed */
+        if (isRejected) return false;
+        if (!state.showCompleted && j.status === DONE_STATUS) return false;
+      }
       if (!q) return true;
       var c = getClient(j.clientId);
       return [j.sanRef, j.clientRef, j.jobName, j.jobAddress, j.status, c ? c.name : ""]
@@ -1722,11 +1735,12 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div><h1>Jobs</h1><p class="sub">' + jobs.length + ' job' + (jobs.length === 1 ? "" : "s") + ' in the system</p></div>' +
       '<div class="headctrls">' +
       '<label class="toggle"><input type="checkbox" data-action="showcompleted" ' + (state.showCompleted ? "checked" : "") + '><span>Show completed' + (completedCount ? " (" + completedCount + ")" : "") + '</span></label>' +
+      '<label class="toggle"><input type="checkbox" data-action="showrejected" ' + (state.showRejected ? "checked" : "") + '><span>Rejected / Cancelled' + (rejectedCount ? " (" + rejectedCount + ")" : "") + '</span></label>' +
       '<label class="toggle"><input type="checkbox" data-action="clientview" ' + (state.clientView ? "checked" : "") + '><span>Client view</span></label>' +
       '<input class="search" placeholder="Search jobs or clients" value="' + esc(state.search) + '" data-search>' +
       '<button class="btn primary" data-action="newjob">New job</button></div></div>' +
       (jobs.length ? '<div class="card"><table class="grid dashgrid"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>' +
-        (list.length ? "" : '<div class="nomatch">' + (q ? 'No jobs match “' + esc(state.search) + '”.' : (completedCount ? 'All jobs are completed — tick “Show completed” to view them.' : 'No jobs to show.')) + '</div>') + '</div>'
+        (list.length ? "" : '<div class="nomatch">' + (q ? 'No jobs match “' + esc(state.search) + '”.' : (state.showRejected ? 'No rejected or cancelled jobs.' : (completedCount ? 'All jobs are completed — tick “Show completed” to view them.' : 'No jobs to show.'))) + '</div>') + '</div>'
         : '<div class="empty"><h3>No jobs yet</h3><p>Create your first job to get started.</p><button class="btn primary" data-action="newjob">New job</button></div>') +
       '</main>' + footer();
   }
@@ -1853,8 +1867,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var exp = expectedFor(job);
     return '<div class="card pad"><div class="formgrid">' +
       '<label class="fld"><span>Client</span><select data-job-client>' + clientOpts + '</select></label>' +
-      field("SAN reference", job.sanRef, "sanRef", "S 0000") +
-      field("Client / job reference", job.clientRef, "clientRef", "J 0000") +
+      field("SAN reference", job.sanRef, "sanRef", "Cash Sale Invoiced / Quote (Smith)") +
+      field("Client / job reference", job.clientRef, "clientRef", "0000") +
       field("Job name", job.jobName, "jobName", "e.g. Wilson Homes") +
       field("Job address", job.jobAddress, "jobAddress", "Delivery address") +
       field("Date received", job.dateReceived, "dateReceived", "", "date") +
@@ -2952,9 +2966,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Opening a job", a: "Press the \u201CEdit\u201D button on the left of any job row to open it. Inside a job you'll find tabs: Job info, Windows, Cloth cut list, Labels and Pricing." },
         { q: "What the columns mean", a: "SAN Ref is the job's reference number. Job is its name. Client and Address show who and where. Stage is how far along it is (tap the coloured box to change it). Expected is the completion date the program works out for you." },
         { q: "Changing a job's stage", a: "Tap the coloured stage box on the job's row and pick the new stage (for example, \u201CIn Production\u201D or \u201CItem on Order\u201D). The colour changes to match. This is how you track progress." },
-        { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "The job stages", a: "The stages, in order, are: Not Started, In Production, Item on Order, Delayed, On Hold, Blinds Ready, Invoiced, Finalised, Cancelled. \u201CFinalised\u201D is the finished state \u2014 those jobs tuck away under \u201CShow completed\u201D. Ticking the Invoiced box on a job also moves its stage to \u201CInvoiced\u201D automatically." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
+        { q: "Jobs due soon (row highlight)", a: "Any job whose expected completion is within the next 7 days (or already overdue) is highlighted with a subtle warm background and an amber bar on the left, so upcoming and overdue jobs stand out at a glance. Completed jobs are never highlighted." }, { q: "The job stages", a: "The stages, in order, are: Not Started, In Production, Item on Order, Delayed, On Hold, Blinds Ready, Invoiced, Finalised, Quote Rejected, Cancelled. \u201CFinalised\u201D is the finished state \u2014 those jobs tuck away under \u201CShow completed\u201D. Ticking the Invoiced box on a job also moves its stage to \u201CInvoiced\u201D automatically." }, { q: "Marking a job invoiced", a: "Open the job, on the Job info tab tick \u201CInvoiced\u201D and type the 5-digit invoice number. A green tick then shows on that job\u2019s row on the dashboard, so you can see at a glance which jobs have been invoiced. Un-ticking clears the number." }, { q: "The expected completion date", a: "The program works this out automatically from the day the job came in, allowing for weekends and public holidays. If you need to override it for one job, tap the date and pick your own \u2014 it turns amber to show it was set by hand. Tap the little \u21BA to go back to the automatic date." },
         { q: "Searching for a job", a: "Use the search box to type a job name, client or reference. The list narrows as you type." },
-        { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
+        { q: "Show completed / Client view", a: "\u201CShow completed\u201D includes finished jobs in the list. \u201CRejected / Cancelled\u201D shows only jobs at those two stages (they\u2019re hidden from the normal list). \u201CClient view\u201D is a tidier read-only look, handy if a customer is standing beside you." },
         { q: "Deleting a job", a: "The trash-can icon on the right of a job row deletes it. Be careful \u2014 this can't be undone. Only delete a job if it was entered by mistake." }
       ]
     },
@@ -3939,6 +3953,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       else if (a === "addon-add") { var ja = getJob(state.jobId); if (!Array.isArray(ja.addons)) ja.addons = []; ja.addons.push({ id: "", qty: 1, targets: [], cat: t.getAttribute("data-cat") || "Blind hardware" }); saveAddons(ja); render(); }
       else if (a === "clientview") { state.clientView = t.checked; render(); }
       else if (a === "showcompleted") { state.showCompleted = t.checked; render(); }
+      else if (a === "showrejected") { state.showRejected = t.checked; render(); }
       else if (a === "print-cloth") printCloth(getJob(state.jobId));
       else if (a === "print-pricing") printPricing(getJob(state.jobId));
       else if (a === "print-blind-labels") printBlindLabels(getJob(state.jobId));
