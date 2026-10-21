@@ -861,14 +861,32 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     return currentPricing();
   }
-  var FABRIC_GROUP_TO_GRID = {
+  /* Back-compat: fabrics historically stored the short name "Group A".."Group E".
+     Map those to the grids' real keys. Any newer group's name IS its grid key/label. */
+  var LEGACY_GROUP_TO_GRID = {
     "Group A": "Group A - Sunscreen",
-    "Group B": "Group B - Roller",
-    "Group C": "Group C",
-    "Group D": "Group D",
-    "Group E": "Group E"
-    /* "Other" intentionally absent -> no automatic price */
+    "Group B": "Group B - Roller"
   };
+  /* Resolve a fabric group NAME to a pricing-grid KEY, using the live grids. */
+  function gridKeyForGroupName(name, P) {
+    if (!name) return "";
+    P = P || currentPricing();
+    var groups = (P && P.groups) || [];
+    /* exact key match */
+    for (var i = 0; i < groups.length; i++) if (groups[i].key === name) return groups[i].key;
+    /* label match (the Fabrics dropdown shows labels) */
+    for (var j = 0; j < groups.length; j++) if (groups[j].label === name) return groups[j].key;
+    /* legacy short-name match */
+    if (LEGACY_GROUP_TO_GRID[name]) return LEGACY_GROUP_TO_GRID[name];
+    return "";
+  }
+  /* The list of fabric group NAMES, derived from the live price grids (+ "Other"). */
+  function fabricGroupNames() {
+    var P = currentPricing();
+    var names = ((P && P.groups) || []).map(function (g) { return g.label || g.key; });
+    names.push("Other");
+    return names;
+  }
   function fabricPriceGroup(fabricName) {
     /* look up which price group a fabric belongs to, from the Fabrics tab */
     var f = fabricSettings.fabrics.filter(function (x) { return x.name === fabricName; })[0];
@@ -878,7 +896,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     /* one-off / custom fabric can't map to a grid; nor can a fabric with no group */
     if (w.fabricCustom) return "";
     var fg = fabricPriceGroup(w.fabric);
-    return FABRIC_GROUP_TO_GRID[fg] || "";
+    return gridKeyForGroupName(fg);
   }
   function clientDiscountPct(client, fabricGroup) {
     var d = client && client.fabric_discounts;
@@ -1272,7 +1290,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
   /* ---------- blind fabrics + baserails ---------- */
   var BUILTIN_FABRICS = { fabrics: [{"name": "Vibe", "colours": ["Tundra", "Nimbus", "Alloy", "Surf", "Mist", "Terrace", "Limestone", "Pure", "Lace", "Cloud", "Birch", "Loft", "Porcelain", "Linen", "Moon", "Spirit", "Dune", "Dbistro", "Chateau", "Stone", "Clay", "Umber", "Odessey", "Orient", "Coal", "Lava Metallic", "Mercury Metallic", "Brulee Metallic", "Storm", "Whisper", "Ice"]}, {"name": "Aventus 5%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 3%", "colours": ["White", "White Stone", "White Grey", "Charcoal Grey", "Charcoal Bronze", "Charcoal"]}, {"name": "Aventus 10%", "colours": ["Ice", "White", "White Linen", "White Stone", "White Grey", "Concrete", "Dune Grey", "Platinium", "Gull", "Domino", "Wren", "Pewter", "Charcoal Grey", "Charcoal Denim", "Graphite", "Charcoal Bronze", "Charcoal"]}, {"name": "Linesque Blockout", "colours": ["Almond", "Aspen", "Blanco", "Breeze", "Denim", "Dove", "Fig", "Fleece", "Fossil", "Raffia", "Soba", "Vine"]}, {"name": "Linesque Light Filtering", "colours": ["Lily", "Oatcake", "Wicker", "Hazel", "Trellis", "Chestnut", "Owl", "Winter", "Delta", "Granite", "Stonewash", "Levi"]}, {"name": "Endota", "colours": ["Optic", "Natural White", "Almond", "Cashmere", "Pastel", "Soft Sable", "Eucalypt", "Smokey", "Flagstone", "Gentle Grey", "Cool Black"]}, {"name": "Le Reve Blockout", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Le Reve Light Filtering", "colours": ["Crystal", "Shell", "Sand", "Chalk", "Concrete", "Marble", "Graphite", "Pewter", "Mink", "Onyx"]}, {"name": "Mantra Blockout", "colours": ["Cotton", "Opal", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Spice", "Flint", "Pebble", "Shale"]}, {"name": "Mantra Light Filtering", "colours": ["Cotton", "Seed Pearl", "Parchment", "Sesame", "Seagrass", "Pebble", "Shale"]}, {"name": "Skye Blockout", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Skye Light Filtering", "colours": ["Swan", "Porcelain", "Oyster", "Sail", "Chiffon", "Chrome", "Earl Grey", "Blazer", "Raven"]}, {"name": "Palm Beach Blockout", "colours": ["Quill", "Lyric", "Merino", "Jasmine", "Gull", "Porpoise", "Urben", "Thunder", "Summer Storm", "Iron", "Dusk", "Quartz"]}, {"name": "Palm Beach Light Filtering", "colours": ["Melody", "Horizon", "Angora", "Pearl", "Monsoon", "Steel", "Ink"]}, {"name": "Duo Block 3.0", "colours": ["Aztec", "Basalt", "Calm", "Carbon", "Cumulus", "Dove", "Muse", "Nova", "Stella", "Salt"]}, {"name": "Duo Light", "colours": ["Bright White", "Warm White", "Mid Grey"]}, {"name": "Duo Screen", "colours": ["White", "White Stone", "White Linen", "Dune Grey", "White Grey", "Blue Grey", "Charcoal Grey", "Charcoal Slate", "Charcoal"]}, {"name": "Edge", "colours": ["Alabaster", "Ammonite", "Bright", "Calico", "Charcoal", "Ironstone", "Pumice", "Soft Grey"]}, {"name": "Bond", "colours": ["Ice", "Chalk", "Linen", "Taupe", "Cloud", "Concrete", "Granite", "Charcoal"]}, {"name": "Resene Origin", "colours": ["All Black", "Baltic Sea", "Double Stack", "Surrender", "Concrete", "Alabaster", "Black White", "Rice Cake", "Quarter Tea", "Truffle", "Masala", "Bokara Grey"]}, {"name": "St Lucia", "colours": ["Arctic", "Ice", "White", "Stone", "Silver", "Charcoal"]}, {"name": "SB Opulence", "colours": ["White", "Taupe Grey", "Alabaster", "Silver", "Ivory", "Haze", "Champagne", "Shadow", "Merino", "Black"]}, {"name": "Tasman", "colours": ["Ice", "Ivory", "Beech", "Platinium", "Domino", "Storm", "Graphite", "Skyline", "Shadow"]}, {"name": "Woolamai", "colours": ["Cloud", "Silver", "Sand", "Storm", "Driftwood", "Basalt", "Stone", "Onyx"]}, {"name": "Dawn", "colours": ["White", "Linen", "Oyster", "Warm White", "Custom Cream", "Natural", "Angora", "Gosling", "Ecru", "Pannacotta", "Birch", "Thunder", "Soft Grey", "Daybreak", "Cotton", "Ash Blue", "Grey", "Mid Grey", "Crane", "Dark Grey", "Black", "Arum", "Mariah", "Putty", "Misty", "Alabaster", "Ivory", "Sesame", "Dune", "Earthen", "Pewter", "Light Bison", "Slate"]}], baserails: [{"type": "Oval", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "D30 Silent", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone", "Matt Black", "Matt White"]}, {"type": "Minimal", "colours": ["White", "Sandstone", "Black", "Silver", "Dune", "Bronze Pearl", "Bone"]}, {"type": "Lathe", "colours": ["Timber"]}] };
-  var FABRIC_GROUPS = ["Group A", "Group B", "Group C", "Group D", "Group E", "Other"];
+
   var fabricSettings = { fabrics: [], baserails: [] };
   function normaliseFabrics(d) {
     var out = { fabrics: [], baserails: [] };
@@ -2981,7 +2999,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         return '<span class="colchip"><input value="' + esc(c) + '" data-fabcol="' + fi + '_' + ci + '" placeholder="colour">' +
           '<button class="chipx" data-fabcoldel="' + fi + '_' + ci + '" title="Remove colour" aria-label="Remove colour">\u00d7</button></span>';
       }).join("");
-      var grpOpts = '<option value="">Price group…</option>' + FABRIC_GROUPS.map(function (g) { return '<option ' + (g === f.priceGroup ? "selected" : "") + '>' + esc(g) + '</option>'; }).join("");
+      var grpOpts = '<option value="">Price group…</option>' + fabricGroupNames().map(function (g) { return '<option ' + (g === f.priceGroup ? "selected" : "") + '>' + esc(g) + '</option>'; }).join("");
       return '<div class="fabblock">' +
         '<div class="fabhd">' +
           '<button class="cxpand" data-fabtoggle="' + fi + '" aria-label="Show or hide colours">' + (open ? "\u25be" : "\u25b8") + '</button>' +
@@ -3116,7 +3134,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       items: [
         { q: "Editing the fabric list", a: "The Fabrics tab is where you add, rename or remove fabrics and baserails and their colours, and set each fabric's price group. Colours are hidden until you tap a fabric to expand it. Remember to press \u201CSave changes\u201D when you're done." },
         { q: "Editing the hardware list", a: "The Hardware tab is where you manage add-on items (motorisation, brackets, etc.). Each has a name, a price and a category. Press \u201CSave changes\u201D to apply." },
-        { q: "Editing prices", a: "The Prices tab holds the blind price grids (Groups A\u2013E) and the install and GST settings. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
+        { q: "Adding a price / fabric group", a: "On the Prices tab, \u201C+ Add price group\u201D creates a new group (it starts named Group F, G, H\u2026 which you can rename to anything, e.g. \u201CPremium Sheers\u201D). It copies the width/drop bands from the first group \u2014 just fill in the prices and Save. The new group then appears automatically as a fabric group on the Fabrics tab and as a discount row on each client\u2019s Edit screen." }, { q: "Editing prices", a: "The Prices tab holds the blind price grids (Groups A\u2013E) and the install and GST settings. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
         { q: "Public holidays", a: "The Holidays tab is where you record public holidays and shut-down periods. The program skips these when working out expected completion dates, so add them as they're announced." }
       ]
     },
@@ -3330,7 +3348,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
       '<h2 class="sec">Blind types &amp; price grids</h2>' +
       groupCards +
-      '<div style="margin-top:14px"><button class="btn" data-action="group-add">+ Add blind type</button></div>' +
+      '<div style="margin-top:14px"><button class="btn" data-action="group-add">+ Add price group</button>' +
+      '<p class="hint" style="margin:8px 0 0">Each price group here is also a fabric group \u2014 give it a name (e.g. \u201CGroup F\u201D or \u201CPremium Sheers\u201D), set its prices, and it becomes selectable on the Fabrics tab and on each client\u2019s discount list. A new group copies the width/drop bands from the first group; just fill in the prices.</p></div>' +
 
       '<div class="card pad" style="margin-top:22px">' +
       '<b>Putting up a new price list</b>' +
@@ -3478,7 +3497,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var drops = base ? base.drops.slice() : [900, 1200, 1500];
     var rows = {};
     drops.forEach(function (d) { rows[d] = widths.map(function () { return null; }); });
-    P.groups.push({ key: "grp" + Date.now().toString(36), label: "New blind type", widths: widths, drops: drops, rows: rows });
+    /* suggest the next "Group X" letter as a starting name (you can rename it) */
+    var used = {};
+    P.groups.forEach(function (g) {
+      var m = /Group\s+([A-Z])/i.exec(g.label || g.key || "");
+      if (m) used[m[1].toUpperCase()] = true;
+    });
+    var letter = "F";
+    for (var code = 65; code <= 90; code++) { if (!used[String.fromCharCode(code)]) { letter = String.fromCharCode(code); break; } }
+    P.groups.push({ key: "grp" + Date.now().toString(36), label: "Group " + letter, widths: widths, drops: drops, rows: rows });
     markDirty(); render();
   }
 
@@ -3633,7 +3660,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function discountGrid(c) {
     var disc = clientDiscounts(c);
-    var rows = FABRIC_GROUPS.map(function (g) {
+    var rows = fabricGroupNames().map(function (g) {
       var v = (disc[g] === 0 || disc[g]) ? disc[g] : "";
       return '<div class="discrow"><span class="disclbl">' + esc(g) + '</span>' +
         '<span class="discinput"><input type="number" inputmode="decimal" min="0" max="100" step="0.5" ' +
