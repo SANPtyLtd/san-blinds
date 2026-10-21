@@ -1296,7 +1296,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var out = { fabrics: [], baserails: [] };
     if (d && Array.isArray(d.fabrics)) {
       out.fabrics = d.fabrics.filter(function (f) { return f && f.name; }).map(function (f) {
-        return { name: String(f.name), priceGroup: f.priceGroup ? String(f.priceGroup) : "", lfSheer: !!f.lfSheer, colours: Array.isArray(f.colours) ? f.colours.map(String) : [] };
+        return { name: String(f.name), priceGroup: f.priceGroup ? String(f.priceGroup) : "", lfSheer: !!f.lfSheer, fav: !!f.fav, colours: Array.isArray(f.colours) ? f.colours.map(String) : [] };
       });
     }
     if (d && Array.isArray(d.baserails)) {
@@ -1305,6 +1305,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       });
     }
     return out;
+  }
+  /* Fabrics ordered for the window dropdown: favourites first (★), then the rest, each alphabetical. */
+  function orderedFabrics() {
+    var byName = function (a, b) { return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase()); };
+    var favs = fabricSettings.fabrics.filter(function (f) { return f.fav; }).slice().sort(byName);
+    var rest = fabricSettings.fabrics.filter(function (f) { return !f.fav; }).slice().sort(byName);
+    return { favs: favs, rest: rest };
   }
   function fabricColours(name) {
     var f = fabricSettings.fabrics.filter(function (x) { return x.name === name; })[0];
@@ -2016,7 +2023,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         fabricCell = '<input class="fabtext" value="' + esc(w.fabric || "") + '" placeholder="Fabric" data-win="' + w.id + '" data-wf="fabric">';
         colourCell = '<input class="fabtext" value="' + esc(w.fabricColour || "") + '" placeholder="Colour" data-win="' + w.id + '" data-wf="fabricColour">';
       } else {
-        var fOpts = '<option value="">—</option>' + fabricSettings.fabrics.map(function (f) { return opt(f.name, w.fabric); }).join("");
+        var fo = orderedFabrics();
+        var fOpts = '<option value="">—</option>';
+        if (fo.favs.length) {
+          fOpts += '<optgroup label="\u2605 Favourites">' + fo.favs.map(function (f) { return opt(f.name, w.fabric); }).join("") + '</optgroup>';
+          fOpts += '<optgroup label="All fabrics">' + fo.rest.map(function (f) { return opt(f.name, w.fabric); }).join("") + '</optgroup>';
+        } else {
+          fOpts += fo.rest.map(function (f) { return opt(f.name, w.fabric); }).join("");
+        }
         fabricCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="fabric">' + fOpts + '</select>';
         var cOpts = '<option value="">—</option>' + fabricColours(w.fabric).map(function (c) { return opt(c, w.fabricColour); }).join("");
         colourCell = '<select class="fabsel" data-win="' + w.id + '" data-wf="fabricColour"' + (w.fabric ? "" : " disabled") + '>' + cOpts + '</select>';
@@ -3003,6 +3017,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       return '<div class="fabblock">' +
         '<div class="fabhd">' +
           '<button class="cxpand" data-fabtoggle="' + fi + '" aria-label="Show or hide colours">' + (open ? "\u25be" : "\u25b8") + '</button>' +
+          '<button class="starbtn ' + (f.fav ? "on" : "") + '" data-fabfav="' + fi + '" title="' + (f.fav ? "Remove from favourites" : "Add to favourites") + '" aria-label="Favourite fabric">' + (f.fav ? "\u2605" : "\u2606") + '</button>' +
           '<input class="fabname" value="' + esc(f.name) + '" data-fabname="' + fi + '" placeholder="Fabric name">' +
           '<select class="grpsel" data-fabgroup="' + fi + '">' + grpOpts + '</select>' +
           '<label class="lfcheck" title="Tick for sheer / light-filter fabrics that need +400mm on the cloth drop (instead of +250mm)">' +
@@ -3132,7 +3147,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     {
       id: "settings", icon: "\u2699\uFE0F", title: "Fabrics, Hardware, Prices & Holidays",
       items: [
-        { q: "Editing the fabric list", a: "The Fabrics tab is where you add, rename or remove fabrics and baserails and their colours, and set each fabric's price group. Colours are hidden until you tap a fabric to expand it. Remember to press \u201CSave changes\u201D when you're done." },
+        { q: "Favourite fabrics", a: "On the Fabrics tab, tap the star next to a fabric to make it a favourite. Favourites then appear in a \u2605 Favourites group at the top of the fabric drop-down on each window, with all other fabrics listed alphabetically below \u2014 handy for your most-used fabrics." }, { q: "Editing the fabric list", a: "The Fabrics tab is where you add, rename or remove fabrics and baserails and their colours, and set each fabric's price group. Colours are hidden until you tap a fabric to expand it. Remember to press \u201CSave changes\u201D when you're done." },
         { q: "Editing the hardware list", a: "The Hardware tab is where you manage add-on items (motorisation, brackets, etc.). Each has a name, a price and a category. Press \u201CSave changes\u201D to apply." },
         { q: "Adding a price / fabric group", a: "On the Prices tab, \u201C+ Add price group\u201D creates a new group (it starts named Group F, G, H\u2026 which you can rename to anything, e.g. \u201CPremium Sheers\u201D). It copies the width/drop bands from the first group \u2014 just fill in the prices and Save. The new group then appears automatically as a fabric group on the Fabrics tab and as a discount row on each client\u2019s Edit screen." }, { q: "Editing prices", a: "The Prices tab holds the blind price grids (Groups A\u2013E) and the install and GST settings. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
         { q: "Public holidays", a: "The Holidays tab is where you record public holidays and shut-down periods. The program skips these when working out expected completion dates, so add them as they're announced." }
@@ -3233,7 +3248,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var clean = { fabrics: [], baserails: [] };
     (fabricDraft.fabrics || []).forEach(function (f) {
       var name = (f.name || "").trim(); if (!name) return;
-      clean.fabrics.push({ name: name, priceGroup: (f.priceGroup || "").trim(), lfSheer: !!f.lfSheer, colours: (f.colours || []).map(function (c) { return (c || "").trim(); }).filter(Boolean) });
+      clean.fabrics.push({ name: name, priceGroup: (f.priceGroup || "").trim(), lfSheer: !!f.lfSheer, fav: !!f.fav, colours: (f.colours || []).map(function (c) { return (c || "").trim(); }).filter(Boolean) });
     });
     (fabricDraft.baserails || []).forEach(function (b) {
       var type = (b.type || "").trim(); if (!type) return;
@@ -3956,7 +3971,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
       "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client]," +
       "[data-fabdel],[data-basedel],[data-fabcoladd],[data-basecoladd],[data-fabcoldel],[data-basecoldel]," +
-      "[data-fabtoggle],[data-basetoggle],[data-hwdel],[data-help-toggle],[data-winpage],[data-addpage]," +
+      "[data-fabtoggle],[data-fabfav],[data-basetoggle],[data-hwdel],[data-help-toggle],[data-winpage],[data-addpage]," +
       ".m-close,[data-msave]");
     if (!t) return;
     if (priceClick(t)) return;
@@ -3978,6 +3993,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     else if (t.hasAttribute("data-fav-client")) toggleFavourite(t.getAttribute("data-fav-client"));
     else if (t.hasAttribute("data-del-client")) deleteClient(t.getAttribute("data-del-client"));
+    else if (t.hasAttribute("data-fabfav")) { var ffi = +t.getAttribute("data-fabfav"); var fd = ensureFabricDraft(); fd.fabrics[ffi].fav = !fd.fabrics[ffi].fav; render(); }
     else if (t.hasAttribute("data-fabtoggle")) { var fk = +t.getAttribute("data-fabtoggle"); fabricOpen[fk] = !fabricOpen[fk]; render(); }
     else if (t.hasAttribute("data-basetoggle")) { var bk = +t.getAttribute("data-basetoggle"); baserailOpen[bk] = !baserailOpen[bk]; render(); }
     else if (t.hasAttribute("data-fabdel")) { ensureFabricDraft().fabrics.splice(+t.getAttribute("data-fabdel"), 1); render(); }
@@ -4171,13 +4187,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       }
       return;
     }
-    var job = getJob(state.jobId); if (!job) return;
-    if (el.hasAttribute("data-job-field") && el.getAttribute("data-job-field") === "clientNote") {
-      var jN = getJob(state.jobId);
-      if (jN) { noteChanged(jN, el.value); jN.clientNote = el.value; queueJobPatch(jN.id, "client_note", el.value); }
-      return;
-    }
-    if (el.hasAttribute("data-ao-qty")) { var jq = getJob(state.jobId); var aq = jobAddons(jq)[+el.getAttribute("data-ao-qty")]; if (aq) { aq.qty = Math.max(1, parseInt(el.value, 10) || 1); aq.qtyManual = true; saveAddons(jq); } return; }
+    /* Fabrics / Hardware tab inputs — these edit drafts and must work with NO job open,
+       so they are handled BEFORE the "no job" guard below. */
     if (el.hasAttribute("data-hwname")) { ensureHardwareDraft().items[+el.getAttribute("data-hwname")].name = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-hwprice")) { ensureHardwareDraft().items[+el.getAttribute("data-hwprice")].price = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabname")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabname")].name = el.value; syncSavedTag(); return; }
@@ -4185,6 +4196,14 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     if (el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabcol")) { var fc = el.getAttribute("data-fabcol").split("_"); ensureFabricDraft().fabrics[+fc[0]].colours[+fc[1]] = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-basecol")) { var bc = el.getAttribute("data-basecol").split("_"); ensureFabricDraft().baserails[+bc[0]].colours[+bc[1]] = el.value; syncSavedTag(); return; }
+
+    var job = getJob(state.jobId); if (!job) return;
+    if (el.hasAttribute("data-job-field") && el.getAttribute("data-job-field") === "clientNote") {
+      var jN = getJob(state.jobId);
+      if (jN) { noteChanged(jN, el.value); jN.clientNote = el.value; queueJobPatch(jN.id, "client_note", el.value); }
+      return;
+    }
+    if (el.hasAttribute("data-ao-qty")) { var jq = getJob(state.jobId); var aq = jobAddons(jq)[+el.getAttribute("data-ao-qty")]; if (aq) { aq.qty = Math.max(1, parseInt(el.value, 10) || 1); aq.qtyManual = true; saveAddons(jq); } return; }
     if (el.hasAttribute("data-job-field") && el.getAttribute("data-job-field") === "invoiced") {
       job.invoiced = !!el.checked;
       queueJobPatch(job.id, "invoiced", job.invoiced);
