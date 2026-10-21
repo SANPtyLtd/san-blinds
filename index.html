@@ -3333,6 +3333,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       return '<div class="card pricecard">' +
         '<div class="cardbar">' +
         '<input class="grouplabel" value="' + esc(g.label) + '" data-pg="' + gi + '" placeholder="Blind type name">' +
+        '<button class="btn small" data-group-copy="' + gi + '" title="Duplicate this group with all its prices">Copy</button>' +
         '<button class="btn small danger-ghost" data-group-del="' + gi + '">Remove blind type</button>' +
         '</div>' +
         '<div class="gridscroll"><table class="pricegrid">' +
@@ -3392,7 +3393,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<h2 class="sec">Blind types &amp; price grids</h2>' +
       groupCards +
       '<div style="margin-top:14px"><button class="btn" data-action="group-add">+ Add price group</button>' +
-      '<p class="hint" style="margin:8px 0 0">Each price group here is also a fabric group \u2014 give it a name (e.g. \u201CGroup F\u201D or \u201CPremium Sheers\u201D), set its prices, and it becomes selectable on the Fabrics tab and on each client\u2019s discount list. A new group copies the width/drop bands from the first group; just fill in the prices.</p></div>' +
+      '<p class="hint" style="margin:8px 0 0">Each price group here is also a fabric group \u2014 give it a name (e.g. \u201CGroup F\u201D or \u201CPremium Sheers\u201D), set its prices, and it becomes selectable on the Fabrics tab and on each client\u2019s discount list. A new group copies the width/drop bands from the first group; just fill in the prices. To reuse an existing grid, use the <b>Copy</b> button on any group \u2014 it duplicates that group with all its prices filled in, ready to rename (handy when the base prices match but the discount structure differs).</p></div>' +
 
       hardwareSection() +
 
@@ -3511,6 +3512,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       g4.drops.splice(di, 1); delete g4.rows[dv];
       markDirty(); render(); return true;
     }
+    if (t.hasAttribute("data-group-copy")) {
+      copyGroup(+t.getAttribute("data-group-copy")); return true;
+    }
     if (t.hasAttribute("data-group-del")) {
       var gi = +t.getAttribute("data-group-del");
       if (P.groups.length <= 1) { toast("Keep at least one blind type."); return true; }
@@ -3546,6 +3550,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     P.motors.push({ key: "m" + Date.now().toString(36), label: "New item", price: null });
     markDirty(); render();
   }
+  function nextGroupLetter(P) {
+    var used = {};
+    P.groups.forEach(function (g) {
+      var m = /Group\s+([A-Z])/i.exec(g.label || g.key || "");
+      if (m) used[m[1].toUpperCase()] = true;
+    });
+    for (var code = 65; code <= 90; code++) { if (!used[String.fromCharCode(code)]) return String.fromCharCode(code); }
+    return "X";
+  }
   function addGroup() {
     var P = pd();
     var base = P.groups[0];
@@ -3553,15 +3566,26 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     var drops = base ? base.drops.slice() : [900, 1200, 1500];
     var rows = {};
     drops.forEach(function (d) { rows[d] = widths.map(function () { return null; }); });
-    /* suggest the next "Group X" letter as a starting name (you can rename it) */
-    var used = {};
-    P.groups.forEach(function (g) {
-      var m = /Group\s+([A-Z])/i.exec(g.label || g.key || "");
-      if (m) used[m[1].toUpperCase()] = true;
+    P.groups.push({ key: "grp" + Date.now().toString(36), label: "Group " + nextGroupLetter(P), widths: widths, drops: drops, rows: rows });
+    markDirty(); render();
+  }
+  /* Duplicate an existing group — bands AND all prices — inserted right after it. */
+  function copyGroup(gi) {
+    var P = pd();
+    var src = P.groups[gi];
+    if (!src) return;
+    var copy = {
+      key: "grp" + Date.now().toString(36),
+      label: (src.label || "Group") + " (copy)",
+      widths: src.widths.slice(),
+      drops: src.drops.slice(),
+      rows: {}
+    };
+    /* deep-copy every price cell so edits to the copy don't touch the original */
+    src.drops.forEach(function (d) {
+      copy.rows[d] = (src.rows[d] || []).slice();
     });
-    var letter = "F";
-    for (var code = 65; code <= 90; code++) { if (!used[String.fromCharCode(code)]) { letter = String.fromCharCode(code); break; } }
-    P.groups.push({ key: "grp" + Date.now().toString(36), label: "Group " + letter, widths: widths, drops: drops, rows: rows });
+    P.groups.splice(gi + 1, 0, copy);   /* insert just after the original */
     markDirty(); render();
   }
 
@@ -4009,7 +4033,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       "[data-link-client],[data-copy-link],[data-newtoken],[data-del-hgroup],[data-del-qw]," +
       "[data-edit-quote],[data-del-quote],[data-qtoggle],[data-exp-clear],[data-exp-show]," +
       "[data-width-add],[data-width-del],[data-drop-add],[data-drop-del]," +
-      "[data-group-del],[data-addon-del],[data-mo-del],[data-motor-del]," +
+      "[data-group-del],[data-group-copy],[data-addon-del],[data-mo-del],[data-motor-del]," +
       "[data-cu-del],[data-fabric-del],[data-qauthor],[data-fav-client]," +
       "[data-fabdel],[data-basedel],[data-fabcoladd],[data-basecoladd],[data-fabcoldel],[data-basecoldel]," +
       "[data-fabtoggle],[data-fabfav],[data-basetoggle],[data-hwdel],[data-help-toggle],[data-winpage],[data-addpage]," +
