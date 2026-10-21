@@ -592,6 +592,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 .help-a{color:#4a5763;line-height:1.6;font-size:14px}
 .help-foot{margin:18px 2px 0;padding:14px 16px;background:#eef3f6;border-radius:12px;color:var(--dim);font-size:13.5px;line-height:1.6}
 @media (max-width:900px){.navlink.help{margin-left:0}}
+.hwsection{margin-top:24px}
+.hwsection .sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.hwsection .hwctrls{display:flex;gap:8px;align-items:center}
 .hwrow{display:grid;grid-template-columns:1fr 120px 180px 44px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 .hwname{border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:14.5px;font-weight:600}
 .hwprice{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;padding:0 4px 0 9px;background:#fff}
@@ -1686,7 +1689,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<button class="navlink ' + (active === "holidays" ? "on" : "") + '" data-go="holidays">Holidays</button>' +
       '<button class="navlink ' + (active === "prices" ? "on" : "") + '" data-go="prices">Prices</button>' +
       '<button class="navlink ' + (active === "fabrics" ? "on" : "") + '" data-go="fabrics">Fabrics</button>' +
-      '<button class="navlink ' + (active === "hardware" ? "on" : "") + '" data-go="hardware">Hardware</button>' +
+
       '<button class="navlink help ' + (active === "help" ? "on" : "") + '" data-go="help">Help</button>' +
       '</nav>' +
       '<div class="topactions">' +
@@ -2992,6 +2995,19 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       host.innerHTML = '<span class="savedtag">All changes saved</span>';
     }
   }
+  /* The embedded hardware section (inside Prices) has its own control strip. */
+  function syncHardwareTag() {
+    var host = document.querySelector(".hwsection .hwctrls");
+    if (!host) { syncSavedTag(); return; }   /* fall back for the standalone tab */
+    var dirty = hardwareDirty();
+    var hasButtons = !!host.querySelector('[data-action="hardware-save"]');
+    if (dirty && !hasButtons) {
+      host.innerHTML = '<button class="btn small" data-action="hardware-undo">Undo</button>' +
+        '<button class="btn small primary" data-action="hardware-save">Save hardware</button>';
+    } else if (!dirty && hasButtons) {
+      host.innerHTML = '<span class="savedtag">Hardware saved</span>';
+    }
+  }
   /* ---------- Fabrics management tab ---------- */
   var fabricDraft = null;   /* working copy while editing */
   var fabricOpen = {};      /* which fabric colour lists are expanded */
@@ -3148,8 +3164,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       id: "settings", icon: "\u2699\uFE0F", title: "Fabrics, Hardware, Prices & Holidays",
       items: [
         { q: "Favourite fabrics", a: "On the Fabrics tab, tap the star next to a fabric to make it a favourite. Favourites then appear in a \u2605 Favourites group at the top of the fabric drop-down on each window, with all other fabrics listed alphabetically below \u2014 handy for your most-used fabrics." }, { q: "Editing the fabric list", a: "The Fabrics tab is where you add, rename or remove fabrics and baserails and their colours, and set each fabric's price group. Colours are hidden until you tap a fabric to expand it. Remember to press \u201CSave changes\u201D when you're done." },
-        { q: "Editing the hardware list", a: "The Hardware tab is where you manage add-on items (motorisation, brackets, etc.). Each has a name, a price and a category. Press \u201CSave changes\u201D to apply." },
-        { q: "Adding a price / fabric group", a: "On the Prices tab, \u201C+ Add price group\u201D creates a new group (it starts named Group F, G, H\u2026 which you can rename to anything, e.g. \u201CPremium Sheers\u201D). It copies the width/drop bands from the first group \u2014 just fill in the prices and Save. The new group then appears automatically as a fabric group on the Fabrics tab and as a discount row on each client\u2019s Edit screen." }, { q: "Editing prices", a: "The Prices tab holds the blind price grids (Groups A\u2013E) and the install and GST settings. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
+        { q: "Editing the hardware list", a: "Hardware &amp; motorisation items (brackets, motors, etc.) are managed in the Hardware section of the Prices tab. Each has a name, price and category (Motorisation or Blind hardware). Press \u201CSave hardware\u201D to apply. These items are used by both quoting and the job add-ons." },
+        { q: "Adding a price / fabric group", a: "On the Prices tab, \u201C+ Add price group\u201D creates a new group (it starts named Group F, G, H\u2026 which you can rename to anything, e.g. \u201CPremium Sheers\u201D). It copies the width/drop bands from the first group \u2014 just fill in the prices and Save. The new group then appears automatically as a fabric group on the Fabrics tab and as a discount row on each client\u2019s Edit screen." }, { q: "Editing prices", a: "The Prices tab holds the blind price grids, the Hardware &amp; motorisation items, the S-Fold curtain fabrics, and the install and GST settings \u2014 all in one place. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
         { q: "Public holidays", a: "The Holidays tab is where you record public holidays and shut-down periods. The program skips these when working out expected completion dates, so add them as they're announced." }
       ]
     },
@@ -3190,6 +3206,41 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '</main>' + footer();
   }
   var helpOpen = {};
+  /* Hardware management as an embeddable section (used inside the Prices tab).
+     Keeps its own draft + save flow, separate from the price-list draft. */
+  function hardwareSection() {
+    var d = ensureHardwareDraft();
+    function catRows(cat) {
+      var order = d.items.map(function (h, i) { return i; })
+        .filter(function (i) { return d.items[i].cat === cat; })
+        .sort(function (a, b) { return (d.items[a].name || "").toLowerCase().localeCompare((d.items[b].name || "").toLowerCase()); });
+      if (!order.length) return '<p class="dim">No items in this category yet.</p>';
+      return order.map(function (hi) {
+        var h = d.items[hi];
+        var catOpts = HARDWARE_CATEGORIES.map(function (c) { return '<option ' + (c === h.cat ? "selected" : "") + '>' + esc(c) + '</option>'; }).join("");
+        return '<div class="hwrow">' +
+          '<input class="hwname" value="' + esc(h.name) + '" data-hwname="' + hi + '" placeholder="Item name">' +
+          '<span class="hwprice"><span class="dollar">$</span><input type="number" inputmode="decimal" min="0" step="0.5" value="' + esc(h.price) + '" data-hwprice="' + hi + '" placeholder="0"></span>' +
+          '<select class="hwcat" data-hwcat="' + hi + '">' + catOpts + '</select>' +
+          '<button class="iconbtn del" data-hwdel="' + hi + '" title="Remove item" aria-label="Remove item">\u{1F5D1}</button>' +
+          '</div>';
+      }).join("");
+    }
+    var dirty = hardwareDirty();
+    return '<div class="hwsection"><div class="sechead"><h2 class="sec" style="margin:0">Hardware &amp; motorisation</h2>' +
+      '<div class="hwctrls">' +
+      (dirty ? '<button class="btn small" data-action="hardware-undo">Undo</button>' +
+               '<button class="btn small primary" data-action="hardware-save">Save hardware</button>'
+             : '<span class="savedtag">Hardware saved</span>') +
+      '</div></div>' +
+      '<p class="hint" style="margin:0 0 10px">These items can be added to quotes and to jobs. Each has a price and a category (Motorisation or Blind hardware), and client discounts apply by category.</p>' +
+      HARDWARE_CATEGORIES.map(function (cat) {
+        return '<div class="card pad"><div class="cardbar"><div><b>' + esc(cat) + '</b></div>' +
+          '<button class="btn small" data-action="hardware-add" data-cat="' + esc(cat) + '">+ Add item</button></div>' +
+          '<div class="hwhead"><span>Item</span><span>Price</span><span>Category</span><span></span></div>' +
+          catRows(cat) + '</div>';
+      }).join("");
+  }
   function renderHardware() {
     var d = ensureHardwareDraft();
     /* alphabetical within each category, but keep real array indices for editing */
@@ -3335,16 +3386,15 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
 
       '<div class="card pad">' +
       '<div class="formgrid">' +
-      '<label class="fld"><span>Installation, per blind</span><input class="mono" type="number" inputmode="numeric" value="' + esc(P.install) + '" data-pset="install"></label>' +
       '<label class="fld"><span>GST rate (%)</span><input class="mono" type="number" inputmode="numeric" value="' + esc(Math.round(P.gstRate * 1000) / 10) + '" data-pset="gst"></label>' +
       '</div></div>' +
 
-      '<h2 class="sec">Extras</h2>' +
-      '<div class="card">' +
-      '<table class="grid"><thead><tr><th>Name on printed quote</th><th>Short name on screen</th><th class="ralign">Price</th><th></th></tr></thead>' +
-      '<tbody>' + addonRows + '</tbody></table>' +
-      '<div class="entryfoot"><button class="btn small" data-action="addon-add">+ Add extra</button>' +
-      '<span class="count">' + P.addons.length + ' extras</span></div></div>' +
+      '<h2 class="sec">Blind types &amp; price grids</h2>' +
+      groupCards +
+      '<div style="margin-top:14px"><button class="btn" data-action="group-add">+ Add price group</button>' +
+      '<p class="hint" style="margin:8px 0 0">Each price group here is also a fabric group \u2014 give it a name (e.g. \u201CGroup F\u201D or \u201CPremium Sheers\u201D), set its prices, and it becomes selectable on the Fabrics tab and on each client\u2019s discount list. A new group copies the width/drop bands from the first group; just fill in the prices.</p></div>' +
+
+      hardwareSection() +
 
       '<h2 class="sec">S-Fold curtain fabrics</h2>' +
       '<div class="card">' +
@@ -3353,18 +3403,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div class="entryfoot"><button class="btn small" data-action="fabric-add">+ Add fabric</button>' +
       '<span class="count">' + (P.fabrics || []).length + ' fabrics</span></div></div>' +
 
-      '<h2 class="sec">Motorisation</h2>' +
-      '<div class="card">' +
-      '<table class="grid"><thead><tr><th>Item</th><th class="ralign">Price</th><th></th></tr></thead>' +
-      '<tbody>' + motorRows + '</tbody></table>' +
-      '<div class="entryfoot"><button class="btn small" data-action="motor-add">+ Add motorisation item</button>' +
-      '<span class="count">' + (P.motors || []).length + ' items' +
-      (missingMotorPrices ? ' · ' + missingMotorPrices + ' with no price' : '') + '</span></div></div>' +
-
-      '<h2 class="sec">Blind types &amp; price grids</h2>' +
-      groupCards +
-      '<div style="margin-top:14px"><button class="btn" data-action="group-add">+ Add price group</button>' +
-      '<p class="hint" style="margin:8px 0 0">Each price group here is also a fabric group \u2014 give it a name (e.g. \u201CGroup F\u201D or \u201CPremium Sheers\u201D), set its prices, and it becomes selectable on the Fabrics tab and on each client\u2019s discount list. A new group copies the width/drop bands from the first group; just fill in the prices.</p></div>' +
+      '<div class="card pad"><div class="formgrid">' +
+      '<label class="fld"><span>Installation, per blind</span><input class="mono" type="number" inputmode="numeric" value="' + esc(P.install) + '" data-pset="install"></label>' +
+      '</div></div>' +
 
       '<div class="card pad" style="margin-top:22px">' +
       '<b>Putting up a new price list</b>' +
@@ -4189,8 +4230,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }
     /* Fabrics / Hardware tab inputs — these edit drafts and must work with NO job open,
        so they are handled BEFORE the "no job" guard below. */
-    if (el.hasAttribute("data-hwname")) { ensureHardwareDraft().items[+el.getAttribute("data-hwname")].name = el.value; syncSavedTag(); return; }
-    if (el.hasAttribute("data-hwprice")) { ensureHardwareDraft().items[+el.getAttribute("data-hwprice")].price = el.value; syncSavedTag(); return; }
+    if (el.hasAttribute("data-hwname")) { ensureHardwareDraft().items[+el.getAttribute("data-hwname")].name = el.value; syncHardwareTag(); return; }
+    if (el.hasAttribute("data-hwprice")) { ensureHardwareDraft().items[+el.getAttribute("data-hwprice")].price = el.value; syncHardwareTag(); return; }
     if (el.hasAttribute("data-fabname")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabname")].name = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-basename")) { ensureFabricDraft().baserails[+el.getAttribute("data-basename")].type = el.value; syncSavedTag(); return; }
     if (el.hasAttribute("data-fabgroup")) { ensureFabricDraft().fabrics[+el.getAttribute("data-fabgroup")].priceGroup = el.value; syncSavedTag(); return; }
