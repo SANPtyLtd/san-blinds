@@ -416,6 +416,9 @@ input.manualdate{border-color:#d99a2b !important;background:#fff8e8;color:#8a5a0
 .notetag{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:10.5px;
   font-weight:700;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
 .notetag.staff{background:#eef1f4;color:#516072}
+.staffreminder{display:flex;gap:12px;align-items:flex-start;background:#fff7e6;border:1px solid #f0d9a8;border-radius:10px;padding:11px 14px;margin:0 0 16px}
+.staffreminder .srlabel{flex:0 0 auto;font-weight:800;font-size:12px;color:#92670a;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;padding-top:1px}
+.staffreminder .srtext{color:#6b4e0a;font-size:14px;line-height:1.45;font-weight:600}
 .notetag.client{background:#dcf3e4;color:#1d7a45}
 textarea.clientnote{border-color:#bfe6cd;background:#f6fdf9}
 textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)}
@@ -1986,7 +1989,11 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
     }).join("");
     var statusOpts = STATUSES.map(function (s) { return '<option ' + (s === job.status ? "selected" : "") + '>' + esc(s) + '</option>'; }).join("");
     var exp = expectedFor(job);
-    return '<div class="card pad"><div class="formgrid">' +
+    var reminder = (client && (client.staff_reminder || "")).trim();
+    var reminderBanner = reminder
+      ? '<div class="staffreminder"><span class="srlabel">\u26A0 Staff reminder</span><span class="srtext">' + esc(reminder).replace(/\n/g, "<br>") + '</span></div>'
+      : "";
+    return '<div class="card pad">' + reminderBanner + '<div class="formgrid">' +
       '<label class="fld"><span>Client</span><select data-job-client>' + clientOpts + '</select></label>' +
       field("SAN reference", job.sanRef, "sanRef", "Cash Sale Invoiced / Quote (Smith)") +
       field("Client / job reference", job.clientRef, "clientRef", "0000") +
@@ -3164,7 +3171,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
         { q: "Favourites", a: "Tap the star next to a client to pin your regulars to the top of the list. Starred clients sort alphabetically at the top, then everyone else below." },
         { q: "Lead time", a: "You can give a client their own lead time (working days) if theirs differs from the standard 25. Leave it blank to use the standard." },
         { q: "The client's job-status link", a: "Each client has a private link (press \u201CLink\u201D to copy it) that shows them a simple, read-only view of their jobs \u2014 job name, address, stage and expected date. It never shows measurements, prices or other clients." },
-        { q: "Discounts", a: "Near the bottom of a client's Edit screen you can set their discounts: a % for each fabric group, a % for Motorisation and Blind hardware, and special-agreement deals on individual items. Leave anything blank for no discount. The screen scrolls if it gets long." }
+        { q: "Staff reminder (per client)", a: "On a client\u2019s Edit screen there\u2019s a \u201CStaff reminder\u201D box. Anything you put here pops up as a banner on the Job info tab \u2014 and as a brief message \u2014 whenever that client is selected on a job. Handy for things like \u201CUse Group F pricing for this client.\u201D It\u2019s staff-only: it never shows on labels, orders, the printed job list, or the client\u2019s status link." }, { q: "Discounts", a: "Near the bottom of a client's Edit screen you can set their discounts: a % for each fabric group, a % for Motorisation and Blind hardware, and special-agreement deals on individual items. Leave anything blank for no discount. The screen scrolls if it gets long." }
       ]
     },
     {
@@ -3705,9 +3712,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
 
   var toastT;
-  function toast(msg) {
+  function toast(msg, ms) {
     var el = document.getElementById("toast"); el.textContent = msg; el.classList.add("show");
-    clearTimeout(toastT); toastT = setTimeout(function () { el.classList.remove("show"); }, 2800);
+    clearTimeout(toastT); toastT = setTimeout(function () { el.classList.remove("show"); }, ms || 2800);
   }
 
   /* ---------- mutations ---------- */
@@ -3826,6 +3833,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '</div><p class="hint" style="margin:12px 0 0">Leave the lead time blank to use the standard ' + defaultLeadDays() +
       ' working days. Changing it updates the expected date on this client\u2019s jobs.</p>' +
       '<label class="fld wide"><span>Notes</span><textarea rows="2" data-cf="notes">' + esc(c.notes || "") + '</textarea></label>' +
+      '<label class="fld wide"><span>Staff reminder <span class="notetag staff">pops up on new jobs</span></span>' +
+      '<textarea rows="2" placeholder="e.g. Use Group F pricing for this client \u2014 staff only, never shown to the client" data-cf="staff_reminder">' + esc(c.staff_reminder || "") + '</textarea></label>' +
       discountGrid(c),
       async function () {
         var patch = {};
@@ -4512,7 +4521,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       return;
     }
     var job = getJob(state.jobId); if (!job) return;
-    if (el.hasAttribute("data-job-client")) { job.clientId = el.value || null; queueJobPatch(job.id, "client_id", job.clientId); render(); }
+    if (el.hasAttribute("data-job-client")) {
+      job.clientId = el.value || null; queueJobPatch(job.id, "client_id", job.clientId);
+      var selc = getClient(job.clientId);
+      var rem = selc && (selc.staff_reminder || "").trim();
+      if (rem) toast("\u26A0 " + selc.name + ": " + rem, 6000);   /* staff reminder prompt */
+      render();
+    }
     else if (el.getAttribute("data-job-field") === "status") { applyStatusChange(job, el.value); render(); }
     else if (el.getAttribute("data-job-field") === "dateReceived") { job.dateReceived = el.value; queueJobPatch(job.id, "date_received", el.value); render(); }
     else if (el.hasAttribute("data-win") && el.hasAttribute("data-sptype")) {
