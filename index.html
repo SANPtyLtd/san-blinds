@@ -847,6 +847,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       install: isFinite(Number(d.install)) ? Number(d.install) : 0,
       springAssist: isFinite(Number(d.springAssist)) ? Number(d.springAssist) : 36.5,
       gstRate: isFinite(Number(d.gstRate)) ? Number(d.gstRate) : 0.10,
+      defaultLead: isFinite(Number(d.defaultLead)) && Number(d.defaultLead) > 0 ? Number(d.defaultLead) : DEFAULT_LEAD_DAYS,
       addons: Array.isArray(d.addons) ? d.addons : [],
       motors: Array.isArray(d.motors) ? d.motors : MOTOR_ITEMS.slice(),
       fabrics: Array.isArray(d.fabrics) ? d.fabrics : CURTAIN_FABRICS.slice(),
@@ -1053,7 +1054,13 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function normStatus(s) { return (s && STATUS_ALIASES[s]) ? STATUS_ALIASES[s] : (s || "Not Started"); }
   var FACE_REC = ["Face / Make", "Rec / Tight"];
   var MAX_WINDOWS = 30;
-  var DEFAULT_LEAD_DAYS = 25;   /* used when a client has no lead time set */
+  var DEFAULT_LEAD_DAYS = 20;   /* fallback default lead time (overridden by the Prices-tab setting) */
+  /* The editable default lead time, stored in the current price list's data. */
+  function defaultLeadDays() {
+    var P = currentPricing();
+    var d = P && isFinite(Number(P.defaultLead)) && Number(P.defaultLead) > 0 ? Number(P.defaultLead) : NaN;
+    return isFinite(d) ? d : DEFAULT_LEAD_DAYS;
+  }
 
   var db = null, user = null;
   var clients = [], jobs = [], holidays = [], quotes = [], priceLists = [], holidaySet = {};
@@ -1244,7 +1251,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function clientLeadDays(clientId) {
     var c = getClient(clientId);
     var d = c && c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "" ? Number(c.lead_days) : NaN;
-    return (isFinite(d) && d > 0) ? d : DEFAULT_LEAD_DAYS;
+    /* a manually-set client keeps its own value; everyone else uses the editable default */
+    return (isFinite(d) && d > 0) ? d : defaultLeadDays();
   }
   function expectedFor(job) {
     if (job.expectedOverride) return { iso: job.expectedOverride, manual: true };
@@ -1869,7 +1877,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   }
   function clientRow(c) {
     var n = jobs.filter(function (j) { return j.clientId === c.id; }).length;
-    var ld = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "") ? c.lead_days : DEFAULT_LEAD_DAYS;
+    var ld = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "") ? c.lead_days : defaultLeadDays();
     var custom = (c.lead_days !== null && c.lead_days !== undefined && c.lead_days !== "");
     return '<tr><td class="starcell">' +
       '<button class="starbtn ' + (c.is_favourite ? "on" : "") + '" data-fav-client="' + c.id + '" ' +
@@ -3173,7 +3181,7 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       items: [
         { q: "Favourite fabrics", a: "On the Fabrics tab, tap the star next to a fabric to make it a favourite. Favourites then appear in a \u2605 Favourites group at the top of the fabric drop-down on each window, with all other fabrics listed alphabetically below \u2014 handy for your most-used fabrics." }, { q: "Reordering colours", a: "To change the order colours appear in, grab the drag handle (\u2630) on the left of a colour chip and drag it to a new spot. Works on fabric colours and baserail colours, on both computer and iPad. The order you set is the order they appear in the Colour drop-down on each window." }, { q: "Editing the fabric list", a: "The Fabrics tab is where you add, rename or remove fabrics and baserails and their colours, and set each fabric's price group. Colours are hidden until you tap a fabric to expand it. Remember to press \u201CSave changes\u201D when you're done." },
         { q: "Editing the hardware list", a: "Hardware &amp; motorisation items (brackets, motors, etc.) are managed in the Hardware section of the Prices tab. Each has a name, price and category (Motorisation or Blind hardware). Press \u201CSave hardware\u201D to apply. These items are used by both quoting and the job add-ons." },
-        { q: "Adding a price / fabric group", a: "On the Prices tab, \u201C+ Add price group\u201D creates a new group (it starts named Group F, G, H\u2026 which you can rename to anything, e.g. \u201CPremium Sheers\u201D). It copies the width/drop bands from the first group \u2014 just fill in the prices and Save. The new group then appears automatically as a fabric group on the Fabrics tab and as a discount row on each client\u2019s Edit screen." }, { q: "Editing prices", a: "The Prices tab holds the blind price grids, the Hardware &amp; motorisation items, the S-Fold curtain fabrics, and the install and GST settings \u2014 all in one place. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
+        { q: "Changing the default lead time", a: "At the top of the Prices tab there\u2019s a \u201CDefault lead time (working days)\u201D box. This is the standard lead time used to work out expected completion dates. Change it and press Save changes. It only affects clients who are on the default \u2014 any client whose lead time you\u2019ve set by hand on their Edit screen keeps their own value." }, { q: "Adding a price / fabric group", a: "On the Prices tab, \u201C+ Add price group\u201D creates a new group (it starts named Group F, G, H\u2026 which you can rename to anything, e.g. \u201CPremium Sheers\u201D). It copies the width/drop bands from the first group \u2014 just fill in the prices and Save. The new group then appears automatically as a fabric group on the Fabrics tab and as a discount row on each client\u2019s Edit screen." }, { q: "Editing prices", a: "The Prices tab holds the blind price grids, the Hardware &amp; motorisation items, the S-Fold curtain fabrics, and the install and GST settings \u2014 all in one place. Edit the numbers and press \u201CSave changes\u201D. \u201CStart a new price list\u201D keeps old quotes at their old prices while you set new ones." },
         { q: "Public holidays", a: "The Holidays tab is where you record public holidays and shut-down periods. The program skips these when working out expected completion dates, so add them as they're announced." }
       ]
     },
@@ -3396,7 +3404,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       '<div class="card pad">' +
       '<div class="formgrid">' +
       '<label class="fld"><span>GST rate (%)</span><input class="mono" type="number" inputmode="numeric" value="' + esc(Math.round(P.gstRate * 1000) / 10) + '" data-pset="gst"></label>' +
-      '</div></div>' +
+      '<label class="fld"><span>Default lead time (working days)</span><input class="mono" type="number" inputmode="numeric" min="1" value="' + esc(P.defaultLead || DEFAULT_LEAD_DAYS) + '" data-pset="lead"></label>' +
+      '</div>' +
+      '<p class="hint" style="margin:10px 0 0">This is the standard lead time used to work out expected completion dates. Clients whose lead time you\u2019ve set by hand keep their own \u2014 this only changes the default for everyone else.</p></div>' +
 
       '<h2 class="sec">Blind types &amp; price grids</h2>' +
       groupCards +
@@ -3439,7 +3449,9 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
   function priceInput(el) {
     var P = pd(), v = el.value;
     if (el.hasAttribute("data-pset")) {
-      if (el.getAttribute("data-pset") === "install") P.install = Number(v) || 0;
+      var ps = el.getAttribute("data-pset");
+      if (ps === "install") P.install = Number(v) || 0;
+      else if (ps === "lead") P.defaultLead = Math.max(1, Math.round(Number(v) || DEFAULT_LEAD_DAYS));
       else P.gstRate = (Number(v) || 0) / 100;
       markDirty(); return true;
     }
@@ -3810,8 +3822,8 @@ textarea.clientnote:focus{outline:2px solid var(--teal);border-color:var(--teal)
       cf("Email", c.email, "email") + cf("Address", c.address, "address") +
       '<label class="fld"><span>Lead time (working days)</span>' +
       '<input type="number" inputmode="numeric" min="1" value="' + esc(c.lead_days == null ? "" : c.lead_days) +
-      '" placeholder="' + DEFAULT_LEAD_DAYS + ' (default)" data-cf="lead_days"></label>' +
-      '</div><p class="hint" style="margin:12px 0 0">Leave the lead time blank to use the standard ' + DEFAULT_LEAD_DAYS +
+      '" placeholder="' + defaultLeadDays() + ' (default)" data-cf="lead_days"></label>' +
+      '</div><p class="hint" style="margin:12px 0 0">Leave the lead time blank to use the standard ' + defaultLeadDays() +
       ' working days. Changing it updates the expected date on this client\u2019s jobs.</p>' +
       '<label class="fld wide"><span>Notes</span><textarea rows="2" data-cf="notes">' + esc(c.notes || "") + '</textarea></label>' +
       discountGrid(c),
